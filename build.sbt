@@ -51,17 +51,25 @@ Docker / dockerAliases ++= Seq(dockerAlias.value.withTag(git.gitHeadCommit.value
 
 Docker / defaultLinuxInstallLocation := s"/opt/${moduleName.value}"
 
-dockerCommands := Seq(
-  Cmd("FROM", "eclipse-temurin:21-jre"),
-  ExecCmd("RUN", "mkdir", "-p", s"/var/log/${moduleName.value}"),
-  Cmd("ADD", "opt /opt"),
-  Cmd("WORKDIR", s"/opt/${moduleName.value}"),
-  ExecCmd("ENTRYPOINT", s"/opt/${moduleName.value}/bin/${moduleName.value}"),
-  Cmd("RUN", s"chown -R daemon:daemon /opt/${moduleName.value}"),
-  Cmd("RUN", s"mkdir /var/lib/${moduleName.value}"),
-  Cmd("RUN", s"chown -R daemon:daemon /var/lib/${moduleName.value}"),
-  Cmd("RUN", s"chown -R daemon:daemon /var/log/${moduleName.value}"),
-  Cmd("USER", "daemon")
-)
+dockerBaseImage := "eclipse-temurin:21-jre"
+
+// Create writable runtime dirs (local TUF/treehub object storage + logs) owned by the
+// image's non-root run-user. Injected right before native-packager's final USER switch so
+// the mkdir/chown run as root. Works with the layered Docker build (unlike the old
+// hand-written single-stage Dockerfile that hardcoded `ADD opt /opt`).
+dockerCommands := {
+  val name = moduleName.value
+  // treehub/reposerver local blob stores require their parent dir to already exist and be
+  // writable (see LocalFsBlobStore guard), so pre-create the object-storage roots used by
+  // ota-lith-ce.conf. The named volume mounted at /var/lib/$name inherits these on first use.
+  val mk = ExecCmd("RUN", "mkdir", "-p",
+    s"/var/log/$name", s"/var/lib/$name/treehub-objects", s"/var/lib/$name/tuf-objects")
+  val chown = ExecCmd("RUN", "chown", "-R", "1001:0", s"/var/log/$name", s"/var/lib/$name")
+  dockerCommands.value.flatMap {
+    case c @ Cmd("USER", args) if args.trim.nonEmpty && args.trim != "root" =>
+      Seq(mk, chown, c)
+    case c => Seq(c)
+  }
+}
 
 // fork := true // TODO: Not compatible with .properties ?

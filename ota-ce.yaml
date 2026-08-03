@@ -63,7 +63,7 @@ services:
       retries: 10
 
   ota-lith:
-    build: .
+    image: uptane/ota-lith:latest
     restart: always
     depends_on:
       db:
