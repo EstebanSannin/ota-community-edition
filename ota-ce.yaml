@@ -6,21 +6,19 @@
 
 services:
   reverse-proxy:
-    # The official v2 Traefik docker image
-    image: traefik:v2.3
-    # Enables the web UI and tells Traefik to listen to docker
-    command: --api.insecure=true --providers.docker --providers.docker.exposedbydefault=false
+    # Plain nginx Host-based router for *.ota.ce (replaced Traefik, which depended on the
+    # Docker socket and an API version too new for its client on Docker 29).
+    image: nginx:1.27
+    restart: always
     ports:
-      # The HTTP port
       - "80:80"
-      # The Web UI (enabled by --api.insecure=true)
-      - "8080:8080"
+    depends_on:
+      - ota-lith
     volumes:
-      # So that Traefik can listen to the Docker events
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./ota-ce/reverse-proxy.conf:/etc/nginx/conf.d/default.conf:ro
 
   gateway:
-    image: nginx:1.13.7
+    image: nginx:1.27
     restart: always
     command: ["nginx-debug", "-g", "daemon off;"]      
     expose:
@@ -70,47 +68,19 @@ services:
         condition: service_healthy
     command:
        - "-Dconfig.file=/tmp/ota-lith.conf"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.reposerver.service=reposerver
-      - traefik.http.routers.reposerver.rule=Host(`reposerver.ota.ce`)
-      - traefik.http.services.reposerver.loadbalancer.server.port=7100
-      - traefik.http.routers.keyserver.service=keyserver
-      - traefik.http.routers.keyserver.rule=Host(`keyserver.ota.ce`)
-      - traefik.http.services.keyserver.loadbalancer.server.port=7200
-      - traefik.http.routers.director.service=director
-      - traefik.http.routers.director.rule=Host(`director.ota.ce`)
-      - traefik.http.services.director.loadbalancer.server.port=7300
-      - traefik.http.routers.treehub.service=treehub
-      - traefik.http.routers.treehub.rule=Host(`treehub.ota.ce`)
-      - traefik.http.services.treehub.loadbalancer.server.port=7400
     volumes:
       - ./ota-lith-ce.conf:/tmp/ota-lith.conf:ro
       - objects:/var/lib/ota-lith
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7100/health/version || exit 1"]
-      interval: 30s
+      # exec form can't parse the shell '|| exit 1'; use CMD-SHELL. curl is present in the image.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:7100/health/version || exit 1"]
+      interval: 15s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
 
-  # Web UI for OTA Community Edition
-  web-ui:
-    build:
-      context: ./web-ui
-      dockerfile: Dockerfile.ce
-    restart: always
-    ports:
-      - "8000:80"
-    depends_on:
-      ota-lith:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+  # NOTE: the legacy Quasar web-ui service was removed — it no longer builds and is being
+  # replaced by a new minimal provisioning/update UI. (Old sources remain under ./web-ui for now.)
 
   # Kafka and Zookeeper are optional when using test message bus mode
   # Uncomment these if you need Kafka for production message bus

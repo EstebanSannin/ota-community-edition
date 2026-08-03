@@ -17,7 +17,7 @@ curl -X POST "${reposerver}/api/v1/user_repo" -H "${namespace}"
 
 # sleep 5s
 
-id=$(curl --fail --silent -vv "${reposerver}/api/v1/user_repo/root.json" -H "${namespace}" 2>&1 | grep -i x-ats-tuf-repo-id | awk '{print $3}' | tr -d '\r')
+id=$(curl --fail --silent -D - -o /dev/null "${reposerver}/api/v1/user_repo/root.json" -H "${namespace}" | grep -i x-ats-tuf-repo-id | awk '{print $2}' | tr -d '\r')
 
 curl --silent -X POST "${director}/api/v1/admin/repo" -H "${namespace}"
 

@@ -60,6 +60,11 @@ tls_clientcert_path = "client.pem"
 tls_pkey_path = "pkey.pem"
 EOF
 
-curl -X PUT -d "${body}" http://deviceregistry.ota.ce/api/v1/devices -s -S -v -H "Content-Type: application/json" -H "Accept: application/json, */*"
+# device-registry is merged into the director: POST to /device-registry/api/v1/devices on
+# director.ota.ce (routed by traefik to :7300). Namespace defaults to "default".
+curl -X POST -d "${body}" http://director.ota.ce/device-registry/api/v1/devices \
+  -s -S -f -H "Content-Type: application/json" -H "Accept: application/json" \
+  -H "x-ats-namespace: default"
+echo "registered device ${DEVICE_UUID}"
 
 echo "https://ota.ce:30443" > ${device_dir}/gateway.url
