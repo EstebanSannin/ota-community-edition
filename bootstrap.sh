@@ -5,9 +5,17 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-COMPOSE=(docker compose -f ota-ce.yaml)
+# Release mode: if OTA_CE_NS is set, pull prebuilt images (compose.release.yaml) — no sbt needed.
+# Otherwise, build the ota-lith image locally from source (needs JDK 21 + sbt).
 IMG=uptane/ota-lith:latest
 PROJECT=ota-community-edition
+if [ -n "${OTA_CE_NS:-}" ]; then
+  COMPOSE=(docker compose -f compose.release.yaml)
+  RELEASE=1
+else
+  COMPOSE=(docker compose -f ota-ce.yaml)
+  RELEASE=
+fi
 
 say(){ printf '\n\033[1;36m== %s\033[0m\n' "$*"; }
 
@@ -16,16 +24,22 @@ command -v docker >/dev/null || { echo "Docker is required."; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "The 'docker compose' plugin is required."; exit 1; }
 echo "   docker ok"
 
-say "2/6  Building the ota-lith image (if missing)"
-if docker image inspect "$IMG" >/dev/null 2>&1; then
-  echo "   $IMG already present."
-elif command -v sbt >/dev/null 2>&1; then
-  echo "   building with sbt — the first build takes several minutes…"
-  sbt "Docker / publishLocal"
+if [ -n "$RELEASE" ]; then
+  say "2/6  Pulling prebuilt images ($OTA_CE_NS, tag ${OTA_CE_TAG:-latest})"
+  "${COMPOSE[@]}" pull
 else
-  echo "   ERROR: image '$IMG' not found and 'sbt' is not installed."
-  echo "   Install JDK 21 + sbt, run:  sbt \"Docker / publishLocal\"  — then re-run ./bootstrap.sh"
-  exit 1
+  say "2/6  Building the ota-lith image (if missing)"
+  if docker image inspect "$IMG" >/dev/null 2>&1; then
+    echo "   $IMG already present."
+  elif command -v sbt >/dev/null 2>&1; then
+    echo "   building with sbt — the first build takes several minutes…"
+    sbt "Docker / publishLocal"
+  else
+    echo "   ERROR: image '$IMG' not found and 'sbt' is not installed."
+    echo "   Either set OTA_CE_NS to pull prebuilt images, or install JDK 21 + sbt and run:"
+    echo "     sbt \"Docker / publishLocal\"   — then re-run ./bootstrap.sh"
+    exit 1
+  fi
 fi
 
 say "3/6  Generating server + device CA certificates (if missing)"
