@@ -80,8 +80,7 @@ services:
       start_period: 60s
 
   # Minimal OTA console — a small static SPA (served by nginx) that proxies the backend
-  # JSON APIs same-origin. Replaces the legacy Quasar web-ui (removed; sources remain under
-  # ./web-ui for now). Open at http://<host>:8080
+  # JSON APIs same-origin. Replaces the legacy Quasar web-ui. Open at http://<host>:8080
   console:
     image: nginx:1.27
     restart: always
