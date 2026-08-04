@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTA Community Edition — Console</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171b21; --panel2:#1d222a; --line:#2a313b;
+    --text:#e6e9ee; --muted:#9aa4b2; --accent:#4f8cff; --accent2:#2f6fe0;
+    --ok:#39c07a; --warn:#e0a53f; --bad:#e0574f; --chip:#232a34;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
+  header .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  header .dot.up{background:var(--ok)} header .dot.down{background:var(--bad)}
+  header .status{color:var(--muted);font-size:12.5px}
+  header .spacer{flex:1}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:8px;padding:7px 12px}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent2);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:disabled{opacity:.5;cursor:not-allowed}
+  main{max-width:1200px;margin:0 auto;padding:24px;display:grid;gap:20px}
+  .grid{display:grid;grid-template-columns:1fr;gap:20px}
+  @media(min-width:960px){.grid{grid-template-columns:1.3fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card h2{margin:0;padding:14px 18px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .card h2 .count{background:var(--chip);color:var(--text);border-radius:20px;padding:1px 9px;font-size:12px;letter-spacing:0}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  td.mono,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+  .muted{color:var(--muted)}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:600}
+  .badge.UpToDate{background:rgba(57,192,122,.15);color:var(--ok)}
+  .badge.Outdated,.badge.UpdatePending{background:rgba(224,165,63,.15);color:var(--warn)}
+  .badge.NotSeen,.badge.Error{background:rgba(224,87,79,.15);color:var(--bad)}
+  .form{padding:18px;display:grid;gap:14px}
+  .form label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  select,input{width:100%;font:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .msg{padding:10px 14px;border-radius:8px;font-size:13px;display:none}
+  .msg.show{display:block}
+  .msg.ok{background:rgba(57,192,122,.12);color:var(--ok);border:1px solid rgba(57,192,122,.3)}
+  .msg.err{background:rgba(224,87,79,.12);color:var(--bad);border:1px solid rgba(224,87,79,.3)}
+  .empty{padding:24px 18px;color:var(--muted);text-align:center;font-size:13px}
+  code{background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>OTA Community Edition</h1>
+  <span class="status" id="status">connecting…</span>
+  <span class="spacer"></span>
+  <button onclick="refreshAll()">↻ Refresh</button>
+</header>
+
+<main>
+  <div class="card">
+    <h2>Devices <span class="count" id="devCount">0</span></h2>
+    <div id="devWrap"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Software versions <span class="count" id="tgtCount">0</span></h2>
+      <div id="tgtWrap"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div style="display:grid;gap:20px;align-content:start">
+      <div class="card">
+        <h2>Upload software version</h2>
+        <div class="form">
+          <div><label>Name</label><input id="upName" placeholder="mypkg"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><label>Version</label><input id="upVer" placeholder="0.0.3"></div>
+            <div><label>Hardware id</label><input id="upHw" placeholder="ota-ce-device"></div>
+          </div>
+          <div><label>Binary file</label><input type="file" id="upFile"></div>
+          <button class="primary" id="upBtn" onclick="uploadVersion()">Upload →</button>
+          <div class="msg" id="upMsg"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Deploy an update</h2>
+        <div class="form">
+          <div>
+            <label>Device</label>
+            <select id="selDevice"></select>
+          </div>
+          <div>
+            <label>Software version</label>
+            <select id="selTarget"></select>
+          </div>
+          <button class="primary" id="deployBtn" onclick="deploy()">Deploy update →</button>
+          <div class="msg" id="deployMsg"></div>
+          <div class="muted" style="font-size:12px">
+            Creates a multi-target update and assigns it to the device. The device installs it on its next check-in.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const api = (p,o)=>fetch(p,o).then(async r=>{if(!r.ok)throw new Error((await r.text())||r.status);const t=await r.text();return t?JSON.parse(t):null;});
+let DEVICES=[], TARGETS=[], INSTALLED={};
+
+function setStatus(up){
+  document.getElementById('dot').className = 'dot '+(up?'up':'down');
+  document.getElementById('status').textContent = up ? 'connected · '+location.host : 'backend unreachable';
+}
+const fmtTime = t => t ? new Date(t).toLocaleString() : '—';
+const shortHash = h => h ? h.slice(0,12) : '';
+
+async function loadDevices(){
+  const d = await api('/api/device-registry/devices');
+  DEVICES = d.values || [];
+  // fetch installed image per device (best-effort)
+  await Promise.all(DEVICES.map(async dev=>{
+    try{ const ecus = await api('/api/director/admin/devices/'+dev.uuid+'/ecus');
+      const pri = (ecus||[]).find(e=>e.primary) || (ecus||[])[0];
+      INSTALLED[dev.uuid] = pri && pri.image ? pri.image.filepath : null;
+    }catch(e){ INSTALLED[dev.uuid]=null; }
+  }));
+  renderDevices();
+}
+function renderDevices(){
+  document.getElementById('devCount').textContent = DEVICES.length;
+  const w = document.getElementById('devWrap');
+  if(!DEVICES.length){ w.innerHTML='<div class="empty">No devices provisioned yet.</div>'; return; }
+  w.innerHTML = '<table><thead><tr><th>Name</th><th>Status</th><th>Installed</th><th>Last seen</th><th>UUID</th></tr></thead><tbody>'+
+    DEVICES.map(d=>{
+      const inst = INSTALLED[d.uuid];
+      return `<tr>
+        <td>${esc(d.deviceName||d.deviceId)}</td>
+        <td><span class="badge ${esc(d.deviceStatus)}">${esc(d.deviceStatus||'—')}</span></td>
+        <td class="mono">${inst?esc(inst):'<span class="muted">—</span>'}</td>
+        <td class="muted">${fmtTime(d.lastSeen)}</td>
+        <td class="mono muted">${esc(d.uuid.slice(0,8))}…</td>
+      </tr>`;}).join('')+'</tbody></table>';
+}
+
+async function loadTargets(){
+  let signed;
+  try{ const r = await api('/api/reposerver/user_repo/targets.json'); signed = r.signed||r; }
+  catch(e){ TARGETS=[]; renderTargets(); return; }
+  const t = signed.targets||{};
+  TARGETS = Object.entries(t).map(([k,v])=>({
+    key:k, name:(v.custom&&v.custom.name)||k, version:(v.custom&&v.custom.version)||'',
+    hw:(v.custom&&v.custom.hardwareIds)||[], hash:(v.hashes&&v.hashes.sha256)||'', length:v.length||0
+  }));
+  renderTargets();
+}
+function renderTargets(){
+  document.getElementById('tgtCount').textContent = TARGETS.length;
+  const w = document.getElementById('tgtWrap');
+  if(!TARGETS.length){ w.innerHTML='<div class="empty">No software versions uploaded.</div>'; }
+  else w.innerHTML='<table><thead><tr><th>Name</th><th>Version</th><th>Hardware</th><th>SHA256</th></tr></thead><tbody>'+
+    TARGETS.map(t=>`<tr><td>${esc(t.name)}</td><td class="mono">${esc(t.version)}</td>
+      <td class="mono muted">${esc(t.hw.join(', '))}</td>
+      <td class="mono muted">${esc(shortHash(t.hash))}…</td></tr>`).join('')+'</tbody></table>';
+  fillSelectors();
+}
+function fillSelectors(){
+  const sd=document.getElementById('selDevice'), st=document.getElementById('selTarget');
+  sd.innerHTML = DEVICES.map(d=>`<option value="${esc(d.uuid)}">${esc(d.deviceName||d.deviceId)}</option>`).join('') || '<option value="">no devices</option>';
+  st.innerHTML = TARGETS.map(t=>`<option value="${esc(t.key)}">${esc(t.name)} ${esc(t.version)} · ${esc(t.hw.join(','))}</option>`).join('') || '<option value="">no versions</option>';
+}
+
+async function deploy(){
+  const uuid=document.getElementById('selDevice').value;
+  const key=document.getElementById('selTarget').value;
+  const msg=document.getElementById('deployMsg'); const btn=document.getElementById('deployBtn');
+  const t=TARGETS.find(x=>x.key===key);
+  if(!uuid||!t){ return showMsg(msg,'err','Pick a device and a version.'); }
+  const hw=t.hw[0]; if(!hw) return showMsg(msg,'err','Target has no hardware id.');
+  btn.disabled=true; showMsg(msg,'ok','Creating update…');
+  try{
+    const mtuBody={targets:{[hw]:{to:{target:t.key,checksum:{method:'sha256',hash:t.hash},targetLength:t.length},targetFormat:'BINARY',generateDiff:false}}};
+    const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mtuBody)})).replace(/"/g,'');
+    const assignBody={correlationId:'urn:here-ota:mtu:'+mtu,mtuId:mtu,devices:[uuid]};
+    const res=await api('/api/director/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(assignBody)});
+    if(res && res.affected && res.affected.length) showMsg(msg,'ok','✓ Update assigned. The device will install '+t.name+' '+t.version+' on next check-in.');
+    else showMsg(msg,'err','Device not affected (already up to date, or hardware mismatch).');
+    setTimeout(refreshAll,800);
+  }catch(e){ showMsg(msg,'err','Failed: '+e.message); }
+  finally{ btn.disabled=false; }
+}
+async function uploadVersion(){
+  const name=document.getElementById('upName').value.trim();
+  const ver=document.getElementById('upVer').value.trim();
+  const hw=document.getElementById('upHw').value.trim();
+  const file=document.getElementById('upFile').files[0];
+  const msg=document.getElementById('upMsg'), btn=document.getElementById('upBtn');
+  if(!name||!ver||!hw||!file) return showMsg(msg,'err','Fill name, version, hardware id and pick a file.');
+  const target=`${name}-${ver}`;
+  const q=`name=${encodeURIComponent(name)}&version=${encodeURIComponent(ver)}&hardwareIds=${encodeURIComponent(hw)}`;
+  const fd=new FormData(); fd.append('file',file);
+  btn.disabled=true; showMsg(msg,'ok','Uploading '+file.name+'…');
+  try{
+    await api(`/api/reposerver/user_repo/targets/${encodeURIComponent(target)}?${q}`,{method:'PUT',body:fd});
+    showMsg(msg,'ok','✓ Uploaded '+target+'. It is now deployable.');
+    document.getElementById('upFile').value='';
+    await loadTargets();
+  }catch(e){ showMsg(msg,'err','Upload failed: '+e.message); }
+  finally{ btn.disabled=false; }
+}
+function showMsg(el,cls,txt){ el.className='msg show '+cls; el.textContent=txt; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function refreshAll(){
+  try{ await Promise.all([loadDevices(),loadTargets()]); setStatus(true); }
+  catch(e){ setStatus(false); }
+}
+refreshAll();
+setInterval(loadDevices, 5000);
+</script>
+</body>
+</html>
