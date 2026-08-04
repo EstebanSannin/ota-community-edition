@@ -93,6 +93,21 @@ services:
       - ./console/index.html:/usr/share/nginx/html/index.html:ro
       - ./console/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
+  # Device provisioning service — serves provision-device.sh and mints+registers device
+  # credentials on demand (the self-hosted equivalent of Torizon Cloud's accounts API).
+  provisioner:
+    build: ./provisioner
+    restart: always
+    depends_on:
+      - ota-lith
+    environment:
+      - GATEWAY_URL=https://ota.ce:30443
+      - DEVICE_REGISTRY_URL=http://ota-lith:7300/device-registry/api/v1/devices
+      - NAMESPACE=default
+    volumes:
+      - ./ota-ce-gen:/gen:ro
+      - ./scripts/certs:/certs:ro
+
   # Kafka and Zookeeper are optional when using test message bus mode
   # Uncomment these if you need Kafka for production message bus
   # zookeeper:

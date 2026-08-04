@@ -68,7 +68,10 @@
 
 <main>
   <div class="card">
-    <h2>Devices <span class="count" id="devCount">0</span></h2>
+    <h2>Devices <span class="count" id="devCount">0</span>
+      <span style="flex:1"></span>
+      <button class="small" onclick="openProvision()">＋ Provision device</button>
+    </h2>
     <div id="devWrap"><div class="empty">Loading…</div></div>
   </div>
 
@@ -133,9 +136,43 @@
   </div>
 </main>
 
+<div id="provModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-start;justify-content:center;padding:60px 16px" onclick="if(event.target===this)closeProvision()">
+  <div class="card" style="max-width:760px;width:100%">
+    <h2>Provision a device <span style="flex:1"></span><button class="small" onclick="closeProvision()">✕</button></h2>
+    <div class="form">
+      <div><label>Device name (optional)</label><input id="provName" placeholder="my-device-01" oninput="renderProvCmd()"></div>
+      <div>
+        <label>Run this on the device as root:</label>
+        <textarea id="provCmd" rows="3" readonly onclick="this.select()"></textarea>
+      </div>
+      <button class="primary" onclick="copyProvCmd()">⧉ Copy command</button>
+      <div class="msg" id="provMsg"></div>
+      <div class="muted" style="font-size:12px">
+        The device fetches this script from the console, receives freshly-minted credentials, points itself at this
+        server, and starts aktualizr. It appears in the Devices list within ~20&nbsp;s of running.
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const api = (p,o)=>fetch(p,o).then(async r=>{if(!r.ok)throw new Error((await r.text())||r.status);const t=await r.text();return t?JSON.parse(t):null;});
 let DEVICES=[], TARGETS=[], INSTALLED={};
+
+// --- Device provisioning (Torizon-style one-liner) ---
+function openProvision(){ document.getElementById('provModal').style.display='flex'; renderProvCmd(); }
+function closeProvision(){ document.getElementById('provModal').style.display='none'; }
+function renderProvCmd(){
+  const name=(document.getElementById('provName').value||'').trim().replace(/[^A-Za-z0-9_-]/g,'');
+  const o=location.origin, n=name?(' -n '+name):'';
+  document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}`;
+}
+function copyProvCmd(){
+  const t=document.getElementById('provCmd');
+  navigator.clipboard.writeText(t.value)
+    .then(()=>showMsg(document.getElementById('provMsg'),'ok','Copied — paste it into a root shell on the device.'))
+    .catch(()=>{ t.select(); document.execCommand('copy'); });
+}
 
 function setStatus(up){
   document.getElementById('dot').className = 'dot '+(up?'up':'down');
