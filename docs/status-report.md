@@ -141,6 +141,20 @@ init dir) and `ota-lith` runs Flyway on boot, so no manual DB step. The README w
 the quickstart, provisioning, deploying (own + delegated), the service map, and ports; stale
 microservice/`campaigner`/`webapp` content was dropped, `git-subtree` + upstream credits kept.
 
+## Prebuilt images / release (commit `5b00772`)
+
+To remove the JDK/sbt barrier, only two images are ours to publish — `ota-lith` (JVM; its jar is
+arch-independent so multi-arch is cheap) and `ota-ce-provisioner`; the rest are stock
+nginx/mariadb + mounted config. `release.sh` does a multi-arch (`amd64`+`arm64`) build & push to
+any registry you're logged into (`NS=<ns> TAG=<ver> ./release.sh`); `compose.release.yaml` pulls
+`${OTA_CE_NS}/…`; and `bootstrap.sh` switches to pull-mode when `OTA_CE_NS` is set.
+
+Published + verified: `samnite/ota-lith:0.1.0` and `samnite/ota-ce-provisioner:0.1.0` (both
+multi-arch, public) were pushed, then **pulled fresh from Docker Hub into a clean bring-up**
+(`OTA_CE_NS=samnite ./bootstrap.sh`) — stack healthy, the persisted DB kept the provisioned
+device, and provisioning still worked. Cross-arch builds needed `binfmt` (`tonistiigi/binfmt`)
+registered on the arm64 host for the amd64 layers.
+
 ## Provisioner hardening — optional token (commit `d7e225a`)
 
 The provisioner supports an optional `PROVISION_TOKEN`. When set, `/api/provision` requires it
@@ -181,6 +195,7 @@ opt-in thin **adapter service** built in phases, kept **secondary**. See
 | Deploy a **delegated OSTREE** package to a device | ✅ verified (pulled from publisher S3) |
 | One-command bring-up (`bootstrap.sh`) | ✅ verified (idempotent) |
 | Optional provisioning token | ✅ verified (401/200) |
+| Prebuilt multi-arch images (pull-and-run) | ✅ verified (`samnite/*:0.1.0`, amd64+arm64) |
 
 ## Known limitations / next steps
 
@@ -223,3 +238,5 @@ source) for driving it by hand; the manual steps `bootstrap.sh` automates are
 - `dff1581` — one-command `bootstrap.sh` + README quickstart rewrite
 - `d7e225a` — provisioner: optional provisioning token
 - `0ddda00` — docs: Torizon-compatible API evaluation
+- `5b00772` — prebuilt-image release path (multi-arch build/push + release compose)
+- published: `samnite/ota-lith:0.1.0`, `samnite/ota-ce-provisioner:0.1.0` (multi-arch, public)

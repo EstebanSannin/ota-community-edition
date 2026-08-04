@@ -14,19 +14,30 @@ by third parties.
 
 ## Quickstart
 
-**Requirements:** Docker (with the `docker compose` plugin). To *build* the `ota-lith` image you
-also need a JDK 21 + [sbt](https://www.scala-sbt.org/) (only for the first build).
+**Requirements:** Docker with the `docker compose` plugin.
+
+**Fastest — pull prebuilt multi-arch images** (`amd64`/`arm64`, no JDK/sbt):
+
+```bash
+OTA_CE_NS=samnite ./bootstrap.sh      # pulls samnite/ota-lith + samnite/ota-ce-provisioner
+```
+
+**Or build from source** (needs JDK 21 + [sbt](https://www.scala-sbt.org/) for the first build):
 
 ```bash
 ./bootstrap.sh
 ```
 
-That builds the image (if needed), generates certificates, starts the stack, and initializes the
-TUF repository. When it finishes, open the console:
+Either way, `bootstrap.sh` generates certificates, starts the stack, and initializes the TUF
+repository (idempotent). When it finishes, open the console:
 
 ```
 http://localhost:8080
 ```
+
+> Publishing your own images: `docker login`, then `NS=<namespace> TAG=<ver> ./release.sh` builds
+> and pushes `ota-lith` + `ota-ce-provisioner` multi-arch. `compose.release.yaml` is what the pull
+> path uses.
 
 Then **Provision device** → copy the one-liner → run it on your device → deploy an update. Stop the
 stack with `docker compose -f ota-ce.yaml down` (add `-v` to also wipe the database).
