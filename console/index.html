@@ -40,7 +40,15 @@
   .badge.NotSeen,.badge.Error{background:rgba(224,87,79,.15);color:var(--bad)}
   .form{padding:18px;display:grid;gap:14px}
   .form label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
-  select,input{width:100%;font:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  select,input,textarea{width:100%;font:inherit;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px;resize:vertical}
+  button.small{padding:4px 9px;font-size:12px}
+  button.danger:hover{border-color:var(--bad);color:var(--bad)}
+  .srcrow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .srcrow:last-child{border-bottom:none}
+  .srcrow .grow{flex:1;min-width:0}
+  .srcrow .name{font-weight:600}
+  .pill{background:var(--chip);border-radius:20px;padding:1px 9px;font-size:11.5px;color:var(--muted)}
   .msg{padding:10px 14px;border-radius:8px;font-size:13px;display:none}
   .msg.show{display:block}
   .msg.ok{background:rgba(57,192,122,.12);color:var(--ok);border:1px solid rgba(57,192,122,.3)}
@@ -102,6 +110,24 @@
             Creates a multi-target update and assigns it to the device. The device installs it on its next check-in.
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Package sources <span class="count" id="srcCount">0</span></h2>
+    <div id="srcWrap"><div class="empty">Loading…</div></div>
+    <div class="form">
+      <div>
+        <label>Add a source — paste the delegation config JSON (keys + delegationMetadata + fetchUrl)</label>
+        <textarea id="srcJson" rows="4" placeholder='{"keys":[…],"delegationMetadata":{"name":"…","keyids":[…],"paths":["*/nightly-*"],"threshold":1},"fetchUrl":{"uri":"https://…"}}'></textarea>
+      </div>
+      <button class="primary" id="srcBtn" onclick="addSource()">Add package source →</button>
+      <div class="msg" id="srcMsg"></div>
+      <div>
+        <label>Browse packages from sources</label>
+        <input id="pkgSearch" placeholder="filter by name, e.g. nightly, imx8, torizon-docker…" oninput="browsePackages()">
+        <div id="pkgWrap" class="muted" style="margin-top:8px;font-size:12.5px">—</div>
       </div>
     </div>
   </div>
@@ -214,8 +240,65 @@ async function uploadVersion(){
 function showMsg(el,cls,txt){ el.className='msg show '+cls; el.textContent=txt; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+const rapi = p => '/api/reposerver/user_repo/'+p;   // reposerver user_repo path
+async function loadSources(){
+  let roles=[];
+  try{ roles = await api(rapi('trusted-delegations')) || []; }catch(e){ roles=[]; }
+  let counts={};
+  try{ const di=await api(rapi('delegations_items')); (di.values||di||[]).forEach(it=>{counts[it.delegatedRoleName]=(counts[it.delegatedRoleName]||0)+1;}); }catch(e){}
+  const infos = await Promise.all(roles.map(r=>api(rapi('trusted-delegations/'+encodeURIComponent(r.name)+'/info')).catch(()=>({}))));
+  document.getElementById('srcCount').textContent=roles.length;
+  const w=document.getElementById('srcWrap');
+  if(!roles.length){ w.innerHTML='<div class="empty">No external package sources yet.</div>'; }
+  else w.innerHTML=roles.map((r,i)=>{
+    const info=infos[i]||{}, n=counts[r.name]||0;
+    return `<div class="srcrow">
+      <div class="grow">
+        <div class="name">${esc(info.friendlyName||r.name)}</div>
+        <div class="muted mono" style="font-size:12px">${esc(r.name)} · paths ${esc((r.paths||[]).join(', '))}</div>
+      </div>
+      <span class="pill">${n} packages</span>
+      <span class="muted" style="font-size:12px">${info.lastFetched?('fetched '+fmtTime(info.lastFetched)):''}</span>
+      <button class="small" title="Refresh" onclick="refreshSource('${esc(r.name)}')">↻</button>
+      <button class="small danger" title="Remove" onclick="removeSource('${esc(r.name)}')">✕</button>
+    </div>`;}).join('');
+  if(roles.length) browsePackages();
+}
+async function addSource(){
+  const msg=document.getElementById('srcMsg'), btn=document.getElementById('srcBtn');
+  let cfg; try{ cfg=JSON.parse(document.getElementById('srcJson').value); }catch(e){ return showMsg(msg,'err','Invalid JSON.'); }
+  const dm=cfg.delegationMetadata, keys=cfg.keys, fu=cfg.fetchUrl;
+  if(!dm||!keys||!fu||!dm.name) return showMsg(msg,'err','JSON needs keys, delegationMetadata (with name), and fetchUrl.');
+  btn.disabled=true; showMsg(msg,'ok','Registering source…');
+  const H={'Content-Type':'application/json'};
+  try{
+    await api(rapi('trusted-delegations/keys'),{method:'PUT',headers:H,body:JSON.stringify(keys)});
+    await api(rapi('trusted-delegations'),{method:'PUT',headers:H,body:JSON.stringify([dm])});
+    await api(rapi('trusted-delegations/'+encodeURIComponent(dm.name)+'/remote'),{method:'PUT',headers:H,body:JSON.stringify({uri:fu.uri,friendlyName:cfg.friendlyName||dm.name})});
+    showMsg(msg,'ok','✓ Source "'+dm.name+'" added and its metadata verified.');
+    document.getElementById('srcJson').value=''; await loadSources();
+  }catch(e){ showMsg(msg,'err','Failed: '+e.message); } finally{ btn.disabled=false; }
+}
+async function refreshSource(name){ try{ await api(rapi('trusted-delegations/'+encodeURIComponent(name)+'/remote/refresh'),{method:'PUT'}); await loadSources(); }catch(e){ alert('Refresh failed: '+e.message); } }
+async function removeSource(name){ if(!confirm('Remove package source "'+name+'"?'))return; try{ await api(rapi('trusted-delegations/'+encodeURIComponent(name)),{method:'DELETE'}); await loadSources(); }catch(e){ alert('Remove failed: '+e.message); } }
+let pkgTimer;
+function browsePackages(){
+  clearTimeout(pkgTimer);
+  pkgTimer=setTimeout(async()=>{
+    const q=document.getElementById('pkgSearch').value.trim(), w=document.getElementById('pkgWrap');
+    try{
+      const di=await api(rapi('delegations_items'+(q?('?nameContains='+encodeURIComponent(q)):'')));
+      const items=(di.values||di||[]);
+      if(!items.length){ w.textContent='No matching packages.'; return; }
+      w.innerHTML='<div class="muted" style="margin-bottom:6px">'+items.length+' package'+(items.length>1?'s':'')+(items.length>25?' — showing 25':'')+'</div>'+
+        items.slice(0,25).map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{};
+          return '<div class="mono" style="padding:3px 0;border-bottom:1px solid var(--line)">'+esc(it.targetFilename)+
+            ' <span class="pill">'+esc((c.hardwareIds||[]).join(','))+'</span> <span class="pill">'+esc(c.targetFormat||'')+'</span></div>';}).join('');
+    }catch(e){ w.textContent='Error: '+e.message; }
+  },300);
+}
 async function refreshAll(){
-  try{ await Promise.all([loadDevices(),loadTargets()]); setStatus(true); }
+  try{ await Promise.all([loadDevices(),loadTargets(),loadSources()]); setStatus(true); }
   catch(e){ setStatus(false); }
 }
 refreshAll();
