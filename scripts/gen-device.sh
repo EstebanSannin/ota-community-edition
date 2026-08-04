@@ -24,8 +24,9 @@ openssl x509 -req -days 365 -extfile "${CWD}/certs/client.ext" -in "${device_dir
 
 cat "${device_dir}/client.pem" "${DEVICES_DIR}/ca.crt" > "${device_dir}/${device_id}.chain.pem"
 
-server_ca=$(realpath ${SERVER_DIR}/server_ca.pem)
-ln -s "${server_ca}" "${device_dir}/ca.pem" || true
+# Copy (don't symlink) so the device directory is self-contained and portable — a symlink
+# to an absolute host path breaks inside containers and on real devices.
+cp "${SERVER_DIR}/server_ca.pem" "${device_dir}/ca.pem"
 
 openssl x509 -in "${device_dir}/client.pem" -text -noout
 
