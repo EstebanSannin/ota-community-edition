@@ -1,1 +1,0 @@
-docker build -t topeysoft/quasar-pre-unit:latest ./unit-docker-context
