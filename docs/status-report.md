@@ -13,6 +13,7 @@ a **delegated OSTree package from an external feed** to it — the device pulls 
 **directly from the publisher's store** (Toradex's S3), installs it, reboots, and reports back.
 It also adds a **minimal web console**, **self-service provisioning**, and **external package
 sources (TUF delegations)**, all verified against Toradex's real "Common Torizon Nightly" feed.
+A single **`bootstrap.sh`** stands the whole stack up from a clean checkout.
 
 ## Goal
 
@@ -130,6 +131,39 @@ The cloud stayed on the arm64 VM; the Torizon device ran in QEMU on a separate x
 same LAN. A small userspace TCP proxy on the Mac (`scratchpad/lanproxy.py`) bridges the VM's
 gateway/console ports to the LAN, and the device maps `ota.ce → <mac-lan-ip>` in `/etc/hosts`.
 
+## One-command bring-up & README (commit `dff1581`)
+
+`bootstrap.sh` brings the whole stack up from a clean checkout — idempotent, and needs **no
+`/etc/hosts`** (it talks to the reverse-proxy via `Host` headers on `localhost`): builds the image
+if missing (sbt), generates certs if missing, `compose up`, waits for `ota-lith` health, then
+initializes the TUF repo. The DB self-initializes (its `db-bootstrap/` is mounted into the MariaDB
+init dir) and `ota-lith` runs Flyway on boot, so no manual DB step. The README was rewritten around
+the quickstart, provisioning, deploying (own + delegated), the service map, and ports; stale
+microservice/`campaigner`/`webapp` content was dropped, `git-subtree` + upstream credits kept.
+
+## Provisioner hardening — optional token (commit `d7e225a`)
+
+The provisioner supports an optional `PROVISION_TOKEN`. When set, `/api/provision` requires it
+(`Authorization: Bearer <token>`, or `X-Provision-Token`); `provision-device.sh` takes `-t <token>`
+and the console's Provision dialog has a token field that appends `-t`. Unset by default (open) for
+frictionless LAN dev. Verified: open → 200, required-without → 401, required-with → 200.
+
+## Cleanup (commits `0e797ab`, `25cee33`)
+
+Removed the 18 MB legacy Quasar `web-ui/` (superseded by `console/`, already dropped from compose)
+and fixed the stale compose comment referencing it. Repo trimmed ~35 MB → ~17 MB. (The
+`deviceregistry` paths under `repos/director/` are the legitimate merged device-registry code and
+were kept.)
+
+## Torizon API compatibility — evaluation only (commit `0ddda00`)
+
+Assessed exposing an API compatible with the official Torizon API 2.0 (41 endpoints), grounded in
+its OpenAPI spec. ~22 endpoints map directly onto our reposerver/director/device-registry
+(devices, packages, `packages_external` = delegations, updates, device token/assignment), ~13 are
+partial (fleets ≈ device groups, lockboxes, metrics), ~6 absent (remote-access). Recommendation: an
+opt-in thin **adapter service** built in phases, kept **secondary**. See
+[torizon-api-compat.md](torizon-api-compat.md).
+
 ## Current status
 
 | Capability | Status |
@@ -145,32 +179,33 @@ gateway/console ports to the LAN, and the device maps `ota.ce → <mac-lan-ip>` 
 | Self-service provisioning (one-liner + console button) | ✅ |
 | Provision a **real stock Torizon OS** device | ✅ verified (QEMU x86) |
 | Deploy a **delegated OSTREE** package to a device | ✅ verified (pulled from publisher S3) |
+| One-command bring-up (`bootstrap.sh`) | ✅ verified (idempotent) |
+| Optional provisioning token | ✅ verified (401/200) |
 
 ## Known limitations / next steps
 
-- **Provisioner has no auth.** Anyone who can reach the LAN endpoint can mint a device cert.
-  Fine for a dev/community tool on a trusted network; a short-lived token (like Torizon's `-t`)
-  would harden it.
-- **Device view is basic.** No update history / rollback UI, no per-device detail page, no
-  live progress during an ostree pull.
-- **Cleanup candidates:** remove the legacy `web-ui/` sources; refresh other `docs/` that still
-  reference the removed `campaigner` / `deviceregistry` hosts.
+- **New web UI (in progress).** A design mockup is approved as the starting point; the real Vue
+  app (replacing the single-file console) is queued against a feature/adjustment list. Richer
+  device view — per-device detail, update/rollback history, live ostree-pull progress — lands with it.
+- **Provisioning auth is opt-in.** `PROVISION_TOKEN` gates minting when set; default is open, which
+  is fine on a trusted LAN but should be set for anything exposed. No per-user auth on the console.
 - **Only x86 was exercised on real hardware/QEMU.** ARM boards in the feed (imx8, am62, jetson,
   …) should work the same way but haven't been run.
+- **Torizon-compatible API** is evaluated but not built (see above) — secondary.
+- **Rebrand/licensing** review is pending a decision (marks + per-component licenses).
 
 ## Reproducing the end-to-end flow
 
-See `test/` for the aktualizr build and the e2e helper scripts (provision, push-update, add
-package source). High level, from the repo on the stack host:
+From a clean checkout on the stack host (needs Docker; sbt + JDK 21 for the first image build):
 
 ```bash
-sbt "Docker / publishLocal"                 # build the ota-lith image
-scripts/gen-server-certs.sh                 # one-time server + device CA
-docker compose -f ota-ce.yaml up -d db ota-lith reverse-proxy gateway console
-scripts/get-credentials.sh                  # create TUF repo + credentials.zip
-scripts/gen-device.sh                       # mint a device + register it
-# build & run aktualizr (see test/aktualizr), then deploy from the console at :8080
+./bootstrap.sh          # build image (if needed) + certs + compose up + init TUF repo
+# open the console at http://localhost:8080 → "Provision device" → run the one-liner on a device
 ```
+
+`test/` has the aktualizr build and e2e helper scripts (provision, push-update, add package
+source) for driving it by hand; the manual steps `bootstrap.sh` automates are
+`scripts/gen-server-certs.sh`, `docker compose -f ota-ce.yaml up -d`, and creating the TUF repo.
 
 ## Branch & commits
 
@@ -180,5 +215,11 @@ scripts/gen-device.sh                       # mint a device + register it
 - `6c4cf3d` — device cert import + event reporting (aktualizr-verified)
 - `abce982` — minimal OTA console
 - `bb8eb57` — console: package sources (TUF delegations)
+- `66125fb` — status report + e2e test/reproducibility helpers
 - `c9b5bb2` — Torizon-style device provisioning (one-liner + console button)
 - `eb9d998` — console: deploy delegated (external) packages to a device
+- `5783a24` — docs: status report (real device + delegated deploy)
+- `0e797ab`, `25cee33` — cleanup: remove legacy `web-ui/`, fix stale ref
+- `dff1581` — one-command `bootstrap.sh` + README quickstart rewrite
+- `d7e225a` — provisioner: optional provisioning token
+- `0ddda00` — docs: Torizon-compatible API evaluation
