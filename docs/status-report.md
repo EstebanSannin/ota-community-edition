@@ -7,10 +7,12 @@ arm64 VM + MariaDB 10.11._
 
 Starting from `v3`, which **would not build or boot from a clean database**, this branch
 brings the `ota-lith` monolith to a **working state on a fresh install** and proves the full
-OTA loop end-to-end with a real `aktualizr` client: build → boot → provision a device →
-upload a package → deploy an update → device installs and reports back. It also adds a
-**minimal web console** and **external package sources (TUF delegations)**, verified against
-Toradex's real "Common Torizon Nightly" feed.
+OTA loop end-to-end. Beyond a synthetic `aktualizr` client, it now provisions a **real, stock
+Common Torizon OS device** (QEMU, `intel-corei7-64`) via a Torizon-style one-liner and deploys
+a **delegated OSTree package from an external feed** to it — the device pulls the ostree commit
+**directly from the publisher's store** (Toradex's S3), installs it, reboots, and reports back.
+It also adds a **minimal web console**, **self-service provisioning**, and **external package
+sources (TUF delegations)**, all verified against Toradex's real "Common Torizon Nightly" feed.
 
 ## Goal
 
@@ -91,6 +93,43 @@ Verified against the real **Common Torizon Nightly** feed: the reposerver fetche
 metadata, **verified its RSA-PSS signature**, and listed **578 packages** — browsable via the
 console.
 
+## Self-service device provisioning (commit `c9b5bb2`)
+
+Replicates Torizon Cloud's provisioning UX for the self-hosted CE. A small `provisioner/`
+service serves `provision-device.sh` and **mints + registers** a device on demand (the
+equivalent of Torizon's accounts API returning `device.zip`): it generates an EC key + cert
+signed by the devices CA, registers the device, and returns the credential bundle. On the
+device you run a **one-liner**:
+
+```bash
+curl -fsSL http://<server>:8080/provision-device.sh | sudo bash -s -- -s http://<server>:8080 -n <name>
+```
+
+which drops the credentials into `/var/sota/import/`, overrides the baked-in (Torizon Cloud)
+gateway URL + server CA via `/etc/sota/conf.d/`, and starts `aktualizr`. The console has a
+**"Provision device"** button that shows/copies this command.
+
+## Delegated OSTree deploy to a real device (commit `eb9d998`)
+
+The delegation model works **without mirroring anything** — the key realization corrected an
+earlier wrong assumption. Every delegated target carries a `custom.uri` pointing at the
+publisher's own ostree store; `aktualizr`'s `OstreeManager::pull` uses `target.uri()` when
+present (falling back to the configured treehub only for targets without one), and the
+director's MTU `TargetUpdate` has a `uri` field that propagates it into the device's metadata.
+
+Verified end-to-end on a stock **Common Torizon OS 7.7.0** `intel-corei7-64` device in QEMU:
+provisioned against this cloud → assigned a delegated `nightly-7.7.0` target → the device
+**pulled the ostree commit straight from Toradex's S3** (`aws-ostree-common-torizon`, per the
+delegation's `uri`, *not* our treehub) → deployed, rebooted into build.361, kept the previous
+build as an automatic **rollback**, and reported **UpToDate**. This is the "third-party
+publisher hosts their own objects" model working on a self-hosted cloud. The console's package
+browser has a per-row **Deploy** button that performs this (MTU-with-`uri` + assignment).
+
+### Networking for the real-device test
+The cloud stayed on the arm64 VM; the Torizon device ran in QEMU on a separate x86 host on the
+same LAN. A small userspace TCP proxy on the Mac (`scratchpad/lanproxy.py`) bridges the VM's
+gateway/console ports to the LAN, and the device maps `ota.ce → <mac-lan-ip>` in `/etc/hosts`.
+
 ## Current status
 
 | Capability | Status |
@@ -103,21 +142,21 @@ console.
 | Device downloads, installs, reports; director reflects state | ✅ verified |
 | Web console (devices / versions / upload / deploy / sources) | ✅ |
 | Add external package source (TUF delegation) + browse | ✅ verified (578 pkgs) |
-| Deploy a **delegated OSTREE** package to a device | ⏳ not yet (see below) |
+| Self-service provisioning (one-liner + console button) | ✅ |
+| Provision a **real stock Torizon OS** device | ✅ verified (QEMU x86) |
+| Deploy a **delegated OSTREE** package to a device | ✅ verified (pulled from publisher S3) |
 
 ## Known limitations / next steps
 
-- **Deploying delegated OSTREE packages** is not yet wired. These targets are `OSTREE` format
-  with an external ostree URI; installing one needs a device whose hardware id matches (e.g.
-  `intel-corei7-64`), an OSTREE-format update, and the ostree commit reachable by the device
-  (either pulled from the external URI per the metadata, or mirrored into our treehub — to be
-  determined by experiment).
-- **Real-device experiment (planned):** boot a TorizonCore `intel-corei7-64` image in QEMU,
-  provision it against this cloud, assign a delegated `intel-corei7-64` target, and observe the
-  ostree pull. Note: the only QEMU-runnable feed target is x86, so on an arm64 host it runs
-  under (slow) emulation.
-- **Cleanup candidates:** remove the legacy `web-ui/` sources; refresh `docs/` that still
+- **Provisioner has no auth.** Anyone who can reach the LAN endpoint can mint a device cert.
+  Fine for a dev/community tool on a trusted network; a short-lived token (like Torizon's `-t`)
+  would harden it.
+- **Device view is basic.** No update history / rollback UI, no per-device detail page, no
+  live progress during an ostree pull.
+- **Cleanup candidates:** remove the legacy `web-ui/` sources; refresh other `docs/` that still
   reference the removed `campaigner` / `deviceregistry` hosts.
+- **Only x86 was exercised on real hardware/QEMU.** ARM boards in the feed (imx8, am62, jetson,
+  …) should work the same way but haven't been run.
 
 ## Reproducing the end-to-end flow
 
@@ -141,3 +180,5 @@ scripts/gen-device.sh                       # mint a device + register it
 - `6c4cf3d` — device cert import + event reporting (aktualizr-verified)
 - `abce982` — minimal OTA console
 - `bb8eb57` — console: package sources (TUF delegations)
+- `c9b5bb2` — Torizon-style device provisioning (one-liner + console button)
+- `eb9d998` — console: deploy delegated (external) packages to a device
