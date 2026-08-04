@@ -1,199 +1,114 @@
-# OTA Community Edition (mono)-lith
+# OTA Community Edition
 
-Easy to run, secure, open source [tuf](https://theupdateframework.io/)/[uptane](https://uptane.github.io/) over the air (OTA) updates.
+A **super-simple, self-hostable OTA cloud** for embedded Linux devices — provision a device and
+deploy over-the-air updates, using the open [TUF](https://theupdateframework.io/)/[Uptane](https://uptane.github.io/)
+update framework. It bundles the Uptane service stack into a single container (`ota-lith`), adds a
+clean web **console**, a **device gateway**, and **self-service provisioning**, and it works with
+**external package sources** (TUF delegations) so devices can pull updates published — and hosted —
+by third parties.
 
-You may not want or need to run [ota-community-edition](https://github.com/advancedtelematic/ota-community-edition) using a microservice architecure. A monolith might fit your use case better if you just want to try `ota-community-edition` or if your organization doesn't need to serve millions of devices. A monolith architecture is easier to deploy and manage, and uses less resources.
+> This is a greenfield fork focused on being easy to run on one machine. It boots from a clean
+> database, provisions real [Torizon OS](https://www.toradex.com/torizon) devices, and deploys both
+> your own packages and delegated OSTree updates. See **[docs/status-report.md](docs/status-report.md)**
+> for the full picture of what works.
 
-This project bundles all the scala apps included in [ota-community-edition](https://github.com/advancedtelematic/ota-community-edition) into a application that can be executed in a single container. The app can be easily configured using a single configuration file and avoids the usage of environment variables to simplifly configuration. Additionally, a `docker-compose` file is provided to run the application. This means you no longer need a kubernetes cluster if you just want to try or test `ota-community-edition`.
+## Quickstart
 
-For small deployments, you don't need kubernetes. This solution can fit your organization better. With this app you could run ota in a single machine/vm + mariadb and kafka.
+**Requirements:** Docker (with the `docker compose` plugin). To *build* the `ota-lith` image you
+also need a JDK 21 + [sbt](https://www.scala-sbt.org/) (only for the first build).
 
-## Active branches
+```bash
+./bootstrap.sh
+```
 
-Currently there are three active branches in this repository:
+That builds the image (if needed), generates certificates, starts the stack, and initializes the
+TUF repository. When it finishes, open the console:
 
-- `master`. `ota-community-edition` running without webapp and with kafka, using a single scala app.
+```
+http://localhost:8080
+```
 
-- `webapp`. The webapp is broken in `ota-community-edition` and therefore is not included in `ota-lith/master`. The `webapp` branch includes patched version of `webapp` that does not rely on user profile and is therefore working with both `ota-community-edition` and `ota-lith`.
+Then **Provision device** → copy the one-liner → run it on your device → deploy an update. Stop the
+stack with `docker compose -f ota-ce.yaml down` (add `-v` to also wipe the database).
+
+## Provisioning a device
+
+The console's **Provision device** button shows a Torizon-style one-liner to run on the device (as
+root):
+
+```bash
+curl -fsSL http://<server>:8080/provision-device.sh | sudo bash -s -- -s http://<server>:8080 -n <name>
+```
+
+It fetches freshly-minted credentials from the cloud, points the device at your gateway, and starts
+the update client. The device appears in the console within ~20 s. (For manual/scripted provisioning
+without the console, see `scripts/gen-device.sh`.)
+
+## Deploying software
+
+- **Your own packages** — upload a binary version in the console (**Packages → Upload**), then
+  **Deploy** it to a device.
+- **External package sources** — add a TUF **delegation** (**Package Sources → Add source**) to
+  trust a third-party feed. Its packages become browsable and deployable; devices pull the OSTree
+  objects **directly from the publisher's store** (the URI in the delegation metadata), so you don't
+  host or mirror them. This is verified end-to-end against Toradex's *Common Torizon Nightly* feed.
+
+## What's inside
+
+| Service | Role |
+|---|---|
+| `ota-lith` | The Uptane stack in one container: **reposerver** + **keyserver** (ota-tuf), **director** (with device-registry merged in), **treehub** |
+| `gateway` | Device-facing mTLS endpoint; proxies director / repo / treehub / registration to the device |
+| `reverse-proxy` | Host-based router for the `*.ota.ce` admin APIs |
+| `console` | The web UI (static SPA + same-origin API proxy) |
+| `provisioner` | Mints + registers device credentials on demand (serves `provision-device.sh`) |
+| `db` | MariaDB (self-initializes the databases on first start) |
+
+Ports: **8080** console · **80** admin APIs (`*.ota.ce`) · **30443** device gateway (mTLS) · **3306** MariaDB.
+
+Configuration is a single file (`ota-lith-ce.conf`) — no sprawl of environment variables. Kafka is
+optional (the default test message bus needs no Kafka); uncomment the services in `ota-ce.yaml` to
+enable it.
+
+## Advanced / manual use
+
+The `*.ota.ce` hostnames are only needed for manual admin scripts (`get-credentials.sh`,
+`gen-device.sh`) run from the host — add them to `/etc/hosts` pointing at `127.0.0.1`:
+
+```
+127.0.0.1 reposerver.ota.ce keyserver.ota.ce director.ota.ce treehub.ota.ce ota.ce
+```
+
+- Deploy via the API or [ota-cli](https://github.com/simao/ota-cli/): see
+  [docs/api-updates.md](docs/api-updates.md) and [docs/updates-ota-cli.md](docs/updates-ota-cli.md).
+- End-to-end test helpers (aktualizr build, provision/update/source scripts): see [test/](test/README.md).
 
 ## Dependency management
-  
-This project follows the upstream [UPTANE OTA](https://uptane.github.io/) (see [sources](https://github.com/uptane/)) projects.
 
-The following forks/branches are included:
+The Uptane services are vendored under `repos/` using
+[git-subtree](https://man.archlinux.org/man/git-subtree.1). Upstream sources:
 
-- tuf https://github.com/uptane/ota-tuf
-- director https://github.com/uptane/director
-- device-registry https://github.com/uptane/ota-device-registry
-- campaigner https://github.com/simao/campaigner
-- treehub https://github.com/uptane/treehub
-- libats https://github.com/uptane/libats
+- ota-tuf (reposerver + keyserver) — https://github.com/uptane/ota-tuf
+- director (device-registry is merged into it here) — https://github.com/uptane/director
+- treehub — https://github.com/uptane/treehub
+- libats — https://github.com/uptane/libats
 
-The dependencies are managed using
-[git-subtree](https://man.archlinux.org/man/git-subtree.1) under the
-`repos` directory on this repository.
+To pull upstream changes, e.g.:
 
-To update to the latest changes from upstream ota-tuf, you could use for example:
-
-    git subtree pull --prefix repos/ota-tuf git@github.com:uptane/ota-tuf.git master --squash
-
-If you wish to make changes to ota-tuf, you could edit directly
-`repos/ota-tuf` and then commit the changes, then use `git-subtree` to
-split the changes and open a pull request upstream. However, a simpler
-way would be to just use `git diff` to generate a patch and apply that
-patch to the repository separately:
-
-    cd repos/ota-tuf
-    git diff . > tuf.patch
-    cd /home/user/my-ota-tuf
-    patch -p3 < tuf.patch
-    
-    # normal git flow to create a PR for ota-tuf
-    
-And then once those changes are merged upstream you could use `git
-subtree pull` to incorporate those changes.
-    
-## Building
-
-To build a container running the services, run `sbt docker:publishLocal`
-
-## Configuration
-
-Configuration is done through a single config file, rather than using enviroment variables. This is meant to simplify the deployment scripts and just pass a `configFile=file.conf` argument to the container, or when needed, using system properties (`-Dkey=value`). An example config file is provied in `ota-lith-ce.conf`.
-
-## Running
-
-If you already have MariaDB (and optionally Kafka) instances you can just run the ota-lith binary using sbt or docker. Note that Kafka is only required if using Kafka message bus mode; the test message bus mode works without Kafka.
-
-### Using sbt
-
-You'll need a valid ota-lith.conf, then run:
-
-    sbt -Dconfig.file=$(pwd)/ota-lith.conf run
-
-### Using docker
-
-The scala apps run in a single container. You'll need MariaDB, and optionally Kafka if using Kafka message bus mode. Write a valid ota-lith.conf. For simple deployments, you can use the test message bus mode which doesn't require Kafka.
-
-    sbt docker:publishLocal
-    docker run --name=ota-lith -v $(pwd)/ota-lith.conf:/tmp/ota-lith.conf uptane/ota-lith:latest -Dconfig.file=/tmp/ota-lith.conf
-    
-If you don't have `sbt` or prefer to use a pre built image, you can use:
-
-    export img=uptane/ota-lith:$(git rev-parse master)
-    docker run --name=ota-lith -v $(pwd)/ota-lith.conf:/tmp/ota-lith.conf $img -Dconfig.file=/tmp/ota-lith.conf
-
-## Running With Docker Compose
-
-The simplest way to deploy ota-community-edition is using docker-compose. This will build the Docker image, set up MariaDB with the required databases, and start all services in a single container.
-
-1. Generate the required certificates using `scripts/gen-server-certs.sh` 
-
-2. Update /etc/hosts with the following host names:
-
-```
-0.0.0.0         reposerver.ota.ce
-0.0.0.0         keyserver.ota.ce
-0.0.0.0         director.ota.ce
-0.0.0.0         treehub.ota.ce
-0.0.0.0         ota.ce
+```bash
+git subtree pull --prefix repos/ota-tuf git@github.com:uptane/ota-tuf.git master --squash
 ```
 
-3. Build the Docker image:
+## Credits & upstream
 
-`sbt docker:publishLocal`
-
-4. Run docker-compose:
- 
-`docker-compose -f ota-ce.yaml up`
-
-The docker-compose configuration will:
-- Build the ota-lith image from the local source
-- Start MariaDB 10.11 with automatic database initialization
-- Start all HTTP API services (reposerver, keyserver, director, treehub) and background daemons in a single container
-- Use the test message bus mode (no Kafka required for simple deployments)
-- Set up the gateway and reverse-proxy for routing
-
-Note: Kafka and Zookeeper are commented out in the docker-compose file since the default configuration uses the test message bus. If you need Kafka for production, uncomment those services in `ota-ce.yaml` and update `ota-lith-ce.conf` to use `messaging.mode = "kafka"`.
-
-5. Test
-
-For example `curl director.ota.ce/health/version`
-
-6. You can now create device credentials and provision devices
-
-Run `scripts/gen-device.sh`. This will create a new dir in `ota-ce-gen/devices/:uuid` where `uuid` is the id of the new device. You can run `aktualizr` in that directory using:
-
-    aktualizr --run-mode=once --config=config.toml
-    
-7. You can now deploy updates to the devices
-
-## Deploy updates
-
-You can either use the API directly or use [ota-cli](https://github.com/simao/ota-cli/) to deploy updates. After provisioning devices (see above).
-
-Before using the api or `ota-cli` you will need to generate a valid `credentials.zip`. Run `scripts/get-credentials.zip`.
-
-To deploy an update using the API and a custom campaign, see [api-updates.md](docs/api-updates.md).
-
-To deploy an update using [ota-cli](https://github.com/simao/ota-cli/) with or without a custom campaign see [updates-ota-cli.md](docs/updates-ota-cli.md).
-
-## FAQ
-
-### Who maintains ota-lith
-
-ota-lith is a collection of scripts and configurations that aggregates
-upstream projects and makes it easier to run a complete OTA
-solution. These scripts and configurations are maintained by
-[simao](https://github.com/simao).
-
-The actual OTA implementation is implemented and maintained by
-multiple uptane contributors under the [uptane
-organization](https://github.com/uptane/).
-
-There are currently multiple contributors to the upstream UPTANE
-repositories, most notably [toradex](https://toradex.com) which runs
-the same uptane implementation as part of the [torizon
-platform](https://app.torizon.io)
-
-### How does it keep up with changes on the Uptane Standard?
-
-All the [UPTANE repositories](https://github.com/uptane) are updated
-frequently and docker images are built and pushed to
-`hub.docker.io`. Periodically, these images are incorporated into
-ota-lith. This is usually just a case of updating the docker tags used
-and creating the containers again.
-
-However, `webapp` and `campaigner` projects are not part of the UPTANE
-repositories and they are independently maintained by HERE Technologies
-GmbH. These changes might or might not be merged back into `ota-lith`,
-depending on the complexity of merging the changes.
-
-### What is the relationship with Advanced Telematic OTA Community Edition?
-
-The OTA Community Edition (OTA CE) was initially created and developed
-by Advanced Telematic Systems GmbH. Advanced Telematic Systems GmbH (ATS)
-was acquired by HERE Technologies GmbH and developed OTA CE
-further. All changes to the already open source components continued
-to be published in the [ats github
-repository](https://github.com/advancedtelematic/).
-
-Recently, the [uptane github organization](https://github.com/uptane/)
-was created and all projects were forked into that organization. HERE
-Technologies continues to develop their OTA solution, publishing
-their open source changes to the ATS github repository.
-
-Changes made to the ATS github repository are merged back to the
-Uptane Repositories by the uptane contributors if they are considered
-important, and they are then used by ota-lith once the docker images
-are updated.
-
-The HERE OTA CE solution appears to be on a bug fix only mode, while
-the UPTANE OTA CE is actively developing new features. 
+The Uptane implementation is developed by the [Uptane contributors](https://github.com/uptane/).
+OTA Community Edition was originally created by Advanced Telematic Systems (later HERE
+Technologies); the single-container `ota-lith` packaging is by [simao](https://github.com/simao).
+[Toradex](https://toradex.com) runs the same Uptane implementation as part of the
+[Torizon platform](https://app.torizon.io). This fork builds on all of that work.
 
 ## Related
 
-- https://github.com/simao/ota-cli
-- https://github.com/advancedtelematic/ota-community-edition
-- https://docs.ota.here.com/getstarted/dev/index.html
-- https://docs.ota.here.com/ota-client/latest/aktualizr-config-options.html
+- https://github.com/uptane/ — upstream Uptane projects
+- https://github.com/simao/ota-cli — command-line OTA client
+- https://developer.toradex.com/torizon/ — Torizon platform docs
