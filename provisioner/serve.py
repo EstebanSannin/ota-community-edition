@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Tiny provisioning service: serves provision-device.sh and mints device credentials.
 Mirrors Torizon Cloud's accounts/devices endpoint for the self-hosted CE."""
-import http.server, subprocess, json
+import http.server, subprocess, json, os, hmac
 
 APP = "/app"
+# If set, /api/provision requires this token (Authorization: Bearer <token>). Unset = open.
+TOKEN = os.environ.get("PROVISION_TOKEN", "").strip()
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def _send(self, code, body, ctype="application/json"):
@@ -26,6 +28,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path.split("?")[0] == "/api/provision":
+            if TOKEN:
+                auth = self.headers.get("Authorization", "")
+                supplied = auth[7:].strip() if auth[:7].lower() == "bearer " else self.headers.get("X-Provision-Token", "").strip()
+                if not hmac.compare_digest(supplied, TOKEN):
+                    self._send(401, json.dumps({"error": "invalid or missing provisioning token"}))
+                    return
             n = int(self.headers.get("Content-Length", "0") or 0)
             raw = self.rfile.read(n) if n else b""
             name = ""

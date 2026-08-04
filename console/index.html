@@ -141,6 +141,7 @@
     <h2>Provision a device <span style="flex:1"></span><button class="small" onclick="closeProvision()">✕</button></h2>
     <div class="form">
       <div><label>Device name (optional)</label><input id="provName" placeholder="my-device-01" oninput="renderProvCmd()"></div>
+      <div><label>Provisioning token (only if this server requires one)</label><input id="provToken" placeholder="leave empty unless PROVISION_TOKEN is set" oninput="renderProvCmd()"></div>
       <div>
         <label>Run this on the device as root:</label>
         <textarea id="provCmd" rows="3" readonly onclick="this.select()"></textarea>
@@ -164,8 +165,9 @@ function openProvision(){ document.getElementById('provModal').style.display='fl
 function closeProvision(){ document.getElementById('provModal').style.display='none'; }
 function renderProvCmd(){
   const name=(document.getElementById('provName').value||'').trim().replace(/[^A-Za-z0-9_-]/g,'');
-  const o=location.origin, n=name?(' -n '+name):'';
-  document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}`;
+  const tok=(document.getElementById('provToken')?.value||'').trim();
+  const o=location.origin, n=name?(' -n '+name):'', t=tok?(' -t '+tok):'';
+  document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}${t}`;
 }
 function copyProvCmd(){
   const t=document.getElementById('provCmd');
