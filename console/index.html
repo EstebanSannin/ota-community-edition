@@ -318,7 +318,7 @@ async function addSource(){
 }
 async function refreshSource(name){ try{ await api(rapi('trusted-delegations/'+encodeURIComponent(name)+'/remote/refresh'),{method:'PUT'}); await loadSources(); }catch(e){ alert('Refresh failed: '+e.message); } }
 async function removeSource(name){ if(!confirm('Remove package source "'+name+'"?'))return; try{ await api(rapi('trusted-delegations/'+encodeURIComponent(name)),{method:'DELETE'}); await loadSources(); }catch(e){ alert('Remove failed: '+e.message); } }
-let pkgTimer;
+let pkgTimer, PKGS=[];
 function browsePackages(){
   clearTimeout(pkgTimer);
   pkgTimer=setTimeout(async()=>{
@@ -327,12 +327,42 @@ function browsePackages(){
       const di=await api(rapi('delegations_items'+(q?('?nameContains='+encodeURIComponent(q)):'')));
       const items=(di.values||di||[]);
       if(!items.length){ w.textContent='No matching packages.'; return; }
-      w.innerHTML='<div class="muted" style="margin-bottom:6px">'+items.length+' package'+(items.length>1?'s':'')+(items.length>25?' — showing 25':'')+'</div>'+
-        items.slice(0,25).map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{};
-          return '<div class="mono" style="padding:3px 0;border-bottom:1px solid var(--line)">'+esc(it.targetFilename)+
-            ' <span class="pill">'+esc((c.hardwareIds||[]).join(','))+'</span> <span class="pill">'+esc(c.targetFormat||'')+'</span></div>';}).join('');
+      PKGS=items.slice(0,25).map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{}, h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{};
+        return {filename:it.targetFilename, hash:h.sha256, uri:c.uri, hw:(c.hardwareIds||[]), format:c.targetFormat||'', len:(it.clientTargetItem&&it.clientTargetItem.length)||0};});
+      const devOpts=DEVICES.map(d=>`<option value="${esc(d.uuid)}">${esc(d.deviceName||d.deviceId)}</option>`).join('')||'<option value="">no devices</option>';
+      w.innerHTML=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <span class="muted">${items.length} package${items.length>1?'s':''}${items.length>25?' — showing 25':''}</span>
+          <span style="flex:1"></span>
+          <span class="muted" style="font-size:12px">deploy to</span>
+          <select id="pkgDevice" style="width:auto;padding:4px 8px">${devOpts}</select>
+        </div>
+        <div class="msg" id="pkgMsg"></div>`+
+        PKGS.map((p,i)=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)">
+          <span class="mono grow" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.filename)}">${esc(p.filename)}</span>
+          <span class="pill">${esc(p.hw.join(','))}</span>
+          <span class="pill">${esc(p.format)}</span>
+          <button class="small" onclick="deployDelegated(${i})">Deploy →</button>
+        </div>`).join('');
     }catch(e){ w.textContent='Error: '+e.message; }
   },300);
+}
+async function deployDelegated(i){
+  const p=PKGS[i], msg=document.getElementById('pkgMsg');
+  const uuid=document.getElementById('pkgDevice').value;
+  if(!uuid) return showMsg(msg,'err','No device selected.');
+  if(!p.hash||!p.uri) return showMsg(msg,'err','Package is missing hash or uri.');
+  const hw=p.hw[0]; if(!hw) return showMsg(msg,'err','Package has no hardware id.');
+  showMsg(msg,'ok','Assigning '+p.filename.split('/').pop()+' …');
+  try{
+    // Delegated/external target: carry the publisher's ostree uri so the device pulls from there.
+    const mtuBody={targets:{[hw]:{to:{target:p.filename,checksum:{method:'sha256',hash:p.hash},targetLength:p.len||0,uri:p.uri}}}};
+    const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(mtuBody)})).replace(/"/g,'');
+    const assignBody={correlationId:'urn:here-ota:mtu:'+mtu,mtuId:mtu,devices:[uuid]};
+    const res=await api('/api/director/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(assignBody)});
+    if(res&&res.affected&&res.affected.length) showMsg(msg,'ok','✓ Assigned. The device pulls it from the source on next check-in.');
+    else showMsg(msg,'err','Device not affected (hardware id mismatch, or already installed).');
+    setTimeout(refreshAll,800);
+  }catch(e){ showMsg(msg,'err','Failed: '+e.message); }
 }
 async function refreshAll(){
   try{ await Promise.all([loadDevices(),loadTargets(),loadSources()]); setStatus(true); }
