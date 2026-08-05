@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh the OTA-CE hardware report periodically
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+AccuracySec=20s
+
+[Install]
+WantedBy=timers.target

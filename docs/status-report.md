@@ -190,6 +190,21 @@ an mTLS `PUT` via a device cert: `200`, and the JSON is stored. Real Torizon dev
 it on the next check-in automatically (a failed PUT never cached aktualizr's "sent-once" hash).
 This unlocks a **Hardware** panel in the UI (memory / disks / CPU / attached devices).
 
+## Device reporter — `ota-hwinfo` (`device-reporter/`)
+
+aktualizr's default `system_info` is a one-time `lshw` dump (sent once, never re-sent). A small
+device-side reporter enriches it: it writes `/var/sota/hwinfo.json` (the `lshw` tree **plus** a
+top-level `ota_report` with kernel version+build, arch, loaded modules, device tree, CPU
+governor, os-release, last boot, and live **USB/block/network peripherals**), and aktualizr
+publishes it via `--hwinfo-file`. A 5-minute timer and a USB **udev** rule regenerate it,
+restarting aktualizr **only when the report changes**. Verified on a real **Verdin iMX8M Plus**:
+plugging in a USB stick appears in the cloud's `system_info.ota_report` (`has_stick: true`).
+Notes: aktualizr reads `--hwinfo-file` at *startup* (so the reporter restarts it on change, via
+an explicit `ExecStart` — the `$AKTUALIZR_CMDLINE_PARAMETERS` env var drops the arg); custom
+`ota_report` keys survive device-registry storage; live runtime metrics (RAM/CPU load) stay out
+of scope (a metrics stream / fluent-bit later). Installs to writable `/var` + `/etc` (ostree
+`/usr` is read-only) via `device-reporter/install.sh`.
+
 ## Current status
 
 | Capability | Status |
@@ -208,6 +223,7 @@ This unlocks a **Hardware** panel in the UI (memory / disks / CPU / attached dev
 | One-command bring-up (`bootstrap.sh`) | ✅ verified (idempotent) |
 | Optional provisioning token | ✅ verified (401/200) |
 | Prebuilt multi-arch images (pull-and-run) | ✅ verified (`samnite/*:0.1.0`, amd64+arm64) |
+| Device reporter — kernel/modules/DT/USB via `--hwinfo-file` | ✅ verified (real Verdin, live USB) |
 
 ## Known limitations / next steps
 

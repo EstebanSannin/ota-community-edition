@@ -1,0 +1,7 @@
+[Unit]
+Description=OTA-CE device hardware/OS reporter (writes /var/sota/hwinfo.json for aktualizr)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/var/lib/ota-hwinfo/ota-hwinfo.sh

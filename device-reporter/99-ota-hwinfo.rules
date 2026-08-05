@@ -1,0 +1,2 @@
+# Refresh the hardware report when a USB device is added/removed (live peripheral changes).
+ACTION=="add|remove", SUBSYSTEM=="usb", RUN+="/usr/bin/systemctl --no-block start ota-hwinfo.service"
