@@ -267,7 +267,7 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
 <div class="toast" id="toast"></div>
 
 <script>
-const api=(p,o)=>fetch(p,o).then(async r=>{if(!r.ok)throw new Error((await r.text())||r.status);const t=await r.text();return t?JSON.parse(t):null;});
+const api=(p,o)=>fetch(p,o).then(async r=>{if(!r.ok)throw new Error((await r.text())||r.status);const t=await r.text();if(!t)return null;try{return JSON.parse(t);}catch(e){return t;}});
 const rapi=p=>'/api/reposerver/user_repo/'+p;
 const dapi=p=>'/api/device-registry/'+p;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -655,7 +655,7 @@ async function loadTargets(){let signed;try{const r=await api(rapi('targets.json
 async function loadSources(){let roles=[];try{roles=await api(rapi('trusted-delegations'))||[];}catch(e){roles=[];}
   PKGCOUNTS={};try{const di=await api(rapi('delegations_items'));(di.values||di||[]).forEach(it=>{PKGCOUNTS[it.delegatedRoleName]=(PKGCOUNTS[it.delegatedRoleName]||0)+1;});}catch(e){}
   const infos=await Promise.all(roles.map(r=>api(rapi('trusted-delegations/'+encodeURIComponent(r.name)+'/info')).catch(()=>({}))));
-  SOURCES=roles.map((r,i)=>({name:r.name,friendlyName:(infos[i]||{}).friendlyName||r.name,paths:r.paths||[],lastFetched:(infos[i]||{}).lastFetched||null,count:PKGCOUNTS[r.name]||0}));
+  SOURCES=roles.map((r,i)=>({name:r.name,friendlyName:(infos[i]||{}).friendlyName||r.name,paths:r.paths||[],lastFetched:(infos[i]||{}).lastFetched||null,remoteUri:(infos[i]||{}).remoteUri||'',count:PKGCOUNTS[r.name]||0}));
   const ts=document.getElementById('t-src');if(ts)ts.textContent=SOURCES.length;
   const tm=document.getElementById('t-src-m');if(tm)tm.textContent=Object.values(PKGCOUNTS).reduce((a,b)=>a+b,0)+' packages available';
   afterPkgData();}
@@ -730,7 +730,29 @@ function openSources(){
 }
 function closeSources(){const m=document.getElementById('srcModal');if(m)m.remove();}
 function renderSourcesModal(){const el=document.getElementById('srcList');if(!el)return;
-  el.innerHTML=SOURCES.length?SOURCES.map(s=>`<div class="srcrow"><span class="pill acc"><span class="d"></span>verified</span><div class="grow"><div class="nm">${esc(s.friendlyName)}</div><div class="muted mono" style="font-size:12px">${esc(s.name)} · ${esc((s.paths||[]).join(', '))} · ${s.lastFetched?('fetched '+relTime(s.lastFetched)):'not fetched'}</div></div><span class="tag">${s.count} pkgs</span><button class="btn sm" onclick="refreshSource('${esc(s.name)}')">Refresh</button><button class="btn sm danger" onclick="removeSource('${esc(s.name)}')">Remove</button></div>`).join(''):'<div class="empty">No package sources yet — add one below.</div>';}
+  el.innerHTML=SOURCES.length?SOURCES.map(s=>`<div class="srcrow"><span class="pill acc"><span class="d"></span>verified</span><div class="grow"><div class="nm">${esc(s.friendlyName)}</div><div class="muted mono" style="font-size:12px">${esc(s.name)} · ${esc((s.paths||[]).join(', '))} · ${s.lastFetched?('fetched '+relTime(s.lastFetched)):'not fetched'}</div></div><span class="tag">${s.count} pkgs</span><button class="btn sm" onclick="editSource('${esc(s.name)}')">Edit</button><button class="btn sm" onclick="refreshSource('${esc(s.name)}')">Refresh</button><button class="btn sm danger" onclick="removeSource('${esc(s.name)}')">Remove</button></div>`).join(''):'<div class="empty">No package sources yet — add one below.</div>';}
+function editSource(name){const s=SOURCES.find(x=>x.name===name);if(!s)return;
+  const ov=document.createElement('div');ov.className='modal open';ov.id='srcEditModal';
+  ov.innerHTML=`<div class="m mini"><header><h3>Edit source</h3></header>
+    <div class="mbody">
+      <label class="ml">Display name</label><input class="mf" id="seName" placeholder="${esc(s.name)}" style="margin-bottom:12px">
+      <label class="ml">Fetch URL</label><input class="mf" id="seUri" style="margin-bottom:4px">
+      <div class="muted" style="font-size:12px">Delegation id <span class="mono">${esc(s.name)}</span> and its signing keys/paths come from the signed metadata and can't be changed here — re-add the source to change those.</div>
+      <div class="msg" id="seMsg" style="margin-top:10px"></div>
+    </div>
+    <footer><button class="btn" onclick="closeEditSource()">Cancel</button><button class="btn primary" id="seBtn" onclick="saveSource('${esc(s.name)}')">Save</button></footer></div>`;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)closeEditSource();});
+  document.body.appendChild(ov);
+  document.getElementById('seName').value=(s.friendlyName&&s.friendlyName!==s.name)?s.friendlyName:'';
+  document.getElementById('seUri').value=s.remoteUri||'';
+  document.getElementById('seName').focus();}
+function closeEditSource(){const m=document.getElementById('srcEditModal');if(m)m.remove();}
+async function saveSource(name){const s=SOURCES.find(x=>x.name===name);if(!s)return;
+  const fn=document.getElementById('seName').value.trim(),uri=document.getElementById('seUri').value.trim(),msg=document.getElementById('seMsg'),btn=document.getElementById('seBtn');
+  if(!uri)return showMsg(msg,'err','Fetch URL is required.');
+  btn.disabled=true;showMsg(msg,'ok','Saving…');
+  try{await api(rapi('trusted-delegations/'+encodeURIComponent(name)+'/remote'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({uri:uri,friendlyName:fn||name})});
+    await loadSources();closeEditSource();renderSourcesModal();renderPackages();toast('Source updated');}catch(e){showMsg(msg,'err','Save failed: '+e.message);btn.disabled=false;}}
 async function addSource(){const msg=document.getElementById('srcMsg'),btn=document.getElementById('srcBtn');
   const raw=(document.getElementById('srcJson').value||'').trim();
   if(!raw)return showMsg(msg,'err','Paste a delegation URL or its JSON.');
