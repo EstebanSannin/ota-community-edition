@@ -49,7 +49,7 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none} :focu
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 15px;border-radius:9px;border:1px solid var(--border);background:var(--surface);font-weight:600;color:var(--text);white-space:nowrap}
 .btn:hover{border-color:var(--border-strong)} .btn svg{width:16px;height:16px;flex:none} .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)} .btn.primary:disabled{opacity:.55;cursor:not-allowed}
 .btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px} .btn.ghost{padding:6px 11px;font-size:12.5px;color:var(--text-dim)} .btn.ghost:hover{color:var(--accent);border-color:var(--accent)} .btn.danger:hover{border-color:var(--bad);color:var(--bad)}
-.content{padding:26px 28px 60px;max-width:1240px;width:100%}
+.content{padding:26px 28px 60px;max-width:1600px;width:100%}
 .view{display:none} .view.active{display:block}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:17px 18px;box-shadow:var(--shadow)}
@@ -57,7 +57,7 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none} :focu
 .cards{display:grid;grid-template-columns:1.55fr 1fr;gap:16px} @media(max-width:900px){.cards{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
 .card>header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
-.card>header svg.hi{width:15px;height:15px;color:var(--text-dim);flex:none}
+svg.hi{width:15px;height:15px;color:var(--text-dim);flex:none}
 .card>header h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:650;margin:0}
 .card>header .count{font-size:11px;color:var(--text-dim);background:var(--surface-2);border-radius:20px;padding:1px 8px;font-weight:600} .card>header .grow{flex:1} .card>header .rep{margin-left:auto}
 .pad{padding:16px 18px}
