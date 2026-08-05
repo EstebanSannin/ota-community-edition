@@ -4,149 +4,122 @@
 <style>
 :root{
   --bg:#f4f7fa; --surface:#ffffff; --surface-2:#eef2f7; --surface-3:#e6ecf3;
-  --border:#dce3ec; --border-strong:#c6d0dd;
-  --text:#0f1823; --text-dim:#566578; --text-faint:#8494a6;
+  --border:#dce3ec; --border-strong:#c6d0dd; --text:#0f1823; --text-dim:#566578; --text-faint:#8494a6;
   --accent:#0c9e90; --accent-ink:#fff; --accent-weak:rgba(12,158,144,.12);
-  --ok:#1a8f46; --ok-bg:rgba(26,143,70,.12);
-  --warn:#a76a12; --warn-bg:rgba(200,130,25,.15);
-  --bad:#cf3a33; --bad-bg:rgba(207,58,51,.12);
-  --idle:#6c7c90; --idle-bg:rgba(108,124,144,.14);
+  --ok:#1a8f46; --ok-bg:rgba(26,143,70,.12); --warn:#a76a12; --warn-bg:rgba(200,130,25,.15);
+  --bad:#cf3a33; --bad-bg:rgba(207,58,51,.12); --idle:#6c7c90; --idle-bg:rgba(108,124,144,.14);
+  --pending:#7a8699; --pending-bg:rgba(122,134,153,.1);
   --shadow:0 1px 2px rgba(16,30,54,.04),0 8px 24px -12px rgba(16,30,54,.18);
-  --radius:12px; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --radius:12px; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root{
-  --bg:#0c121b; --surface:#121b27; --surface-2:#18222f; --surface-3:#1f2b3a;
-  --border:#243141; --border-strong:#31404f; --text:#e9eef5; --text-dim:#9aa9bd; --text-faint:#66768a;
-  --accent:#25d0bf; --accent-ink:#04231f; --accent-weak:rgba(37,208,191,.14);
+  --bg:#0c121b; --surface:#121b27; --surface-2:#18222f; --surface-3:#1f2b3a; --border:#243141; --border-strong:#31404f;
+  --text:#e9eef5; --text-dim:#9aa9bd; --text-faint:#66768a; --accent:#25d0bf; --accent-ink:#04231f; --accent-weak:rgba(37,208,191,.14);
   --ok:#41ba5c; --ok-bg:rgba(65,186,92,.15); --warn:#dca63f; --warn-bg:rgba(220,166,63,.16);
   --bad:#e85c50; --bad-bg:rgba(232,92,80,.16); --idle:#7f8ea3; --idle-bg:rgba(127,142,163,.16);
+  --pending:#6b788c; --pending-bg:rgba(107,120,140,.14);
   --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px -14px rgba(0,0,0,.6);
 }}
-:root[data-theme="light"]{ --bg:#f4f7fa;--surface:#fff;--surface-2:#eef2f7;--surface-3:#e6ecf3;--border:#dce3ec;--border-strong:#c6d0dd;--text:#0f1823;--text-dim:#566578;--text-faint:#8494a6;--accent:#0c9e90;--accent-ink:#fff;--accent-weak:rgba(12,158,144,.12);--ok:#1a8f46;--ok-bg:rgba(26,143,70,.12);--warn:#a76a12;--warn-bg:rgba(200,130,25,.15);--bad:#cf3a33;--bad-bg:rgba(207,58,51,.12);--idle:#6c7c90;--idle-bg:rgba(108,124,144,.14);--shadow:0 1px 2px rgba(16,30,54,.04),0 8px 24px -12px rgba(16,30,54,.18);}
-:root[data-theme="dark"]{ --bg:#0c121b;--surface:#121b27;--surface-2:#18222f;--surface-3:#1f2b3a;--border:#243141;--border-strong:#31404f;--text:#e9eef5;--text-dim:#9aa9bd;--text-faint:#66768a;--accent:#25d0bf;--accent-ink:#04231f;--accent-weak:rgba(37,208,191,.14);--ok:#41ba5c;--ok-bg:rgba(65,186,92,.15);--warn:#dca63f;--warn-bg:rgba(220,166,63,.16);--bad:#e85c50;--bad-bg:rgba(232,92,80,.16);--idle:#7f8ea3;--idle-bg:rgba(127,142,163,.16);--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px -14px rgba(0,0,0,.6);}
-*{box-sizing:border-box}
-html,body{margin:0;padding:0}
+:root[data-theme="light"]{--bg:#f4f7fa;--surface:#fff;--surface-2:#eef2f7;--surface-3:#e6ecf3;--border:#dce3ec;--border-strong:#c6d0dd;--text:#0f1823;--text-dim:#566578;--text-faint:#8494a6;--accent:#0c9e90;--accent-ink:#fff;--accent-weak:rgba(12,158,144,.12);--ok:#1a8f46;--ok-bg:rgba(26,143,70,.12);--warn:#a76a12;--warn-bg:rgba(200,130,25,.15);--bad:#cf3a33;--bad-bg:rgba(207,58,51,.12);--idle:#6c7c90;--idle-bg:rgba(108,124,144,.14);--pending:#7a8699;--pending-bg:rgba(122,134,153,.1);--shadow:0 1px 2px rgba(16,30,54,.04),0 8px 24px -12px rgba(16,30,54,.18);}
+:root[data-theme="dark"]{--bg:#0c121b;--surface:#121b27;--surface-2:#18222f;--surface-3:#1f2b3a;--border:#243141;--border-strong:#31404f;--text:#e9eef5;--text-dim:#9aa9bd;--text-faint:#66768a;--accent:#25d0bf;--accent-ink:#04231f;--accent-weak:rgba(37,208,191,.14);--ok:#41ba5c;--ok-bg:rgba(65,186,92,.15);--warn:#dca63f;--warn-bg:rgba(220,166,63,.16);--bad:#e85c50;--bad-bg:rgba(232,92,80,.16);--idle:#7f8ea3;--idle-bg:rgba(127,142,163,.16);--pending:#6b788c;--pending-bg:rgba(107,120,140,.14);--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px -14px rgba(0,0,0,.6);}
+*{box-sizing:border-box} html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.num{font-variant-numeric:tabular-nums}
-button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums} .num{font-variant-numeric:tabular-nums} .muted{color:var(--text-faint)} .right{text-align:right}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none} :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 .app{display:grid;grid-template-columns:244px 1fr;min-height:100vh}
 .rail{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .brand{display:flex;align-items:center;gap:11px;padding:20px 20px 18px}
 .brand .glyph{width:34px;height:34px;border-radius:9px;background:linear-gradient(140deg,var(--accent),#2b74d6);display:grid;place-items:center;color:var(--accent-ink);flex:none}
-.brand .glyph svg{width:19px;height:19px}
-.brand .name{font-weight:650;letter-spacing:-.01em;line-height:1.15}
+.brand .glyph svg{width:19px;height:19px} .brand .name{font-weight:650;letter-spacing:-.01em;line-height:1.15}
 .brand .name span{display:block;font-size:11px;font-weight:500;color:var(--text-faint)}
 .nav{display:flex;flex-direction:column;gap:2px;padding:8px 12px}
 .nav .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text-faint);padding:14px 10px 6px;font-weight:600}
 .nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--text-dim);font-weight:500;text-decoration:none;cursor:pointer}
-.nav a svg{width:17px;height:17px;flex:none;opacity:.85}
-.nav a:hover{background:var(--surface-2);color:var(--text)}
+.nav a svg{width:17px;height:17px;flex:none;opacity:.85} .nav a:hover{background:var(--surface-2);color:var(--text)}
 .nav a.active{background:var(--accent-weak);color:var(--accent);font-weight:600}
 .nav a .badge{margin-left:auto;font-size:11px;background:var(--surface-3);color:var(--text-dim);border-radius:20px;padding:0 7px;font-weight:600}
 .nav a.active .badge{background:var(--accent);color:var(--accent-ink)}
 .rail .foot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:9px;color:var(--text-dim);font-size:12.5px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--idle)}
-.dot.up{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)} .dot.down{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--idle)} .dot.up{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)} .dot.down{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
 .main{min-width:0;display:flex;flex-direction:column}
 .topbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:15px 28px}
-.topbar h1{font-size:19px;font-weight:650;letter-spacing:-.02em;margin:0}
-.topbar .sub{color:var(--text-faint);font-size:12.5px;margin-top:1px}
-.spacer{flex:1}
+.topbar h1{font-size:19px;font-weight:650;letter-spacing:-.02em;margin:0} .topbar .sub{color:var(--text-faint);font-size:12.5px;margin-top:1px} .spacer{flex:1}
 .iconbtn{width:36px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;color:var(--text-dim)}
-.iconbtn:hover{color:var(--text);border-color:var(--border-strong)}
-.iconbtn svg{width:17px;height:17px}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:9px;border:1px solid var(--border);background:var(--surface);font-weight:600;color:var(--text)}
-.btn:hover{border-color:var(--border-strong)}
-.btn svg{width:16px;height:16px}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.primary:disabled{opacity:.55;cursor:not-allowed}
-.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
-.btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+.iconbtn:hover{color:var(--text);border-color:var(--border-strong)} .iconbtn svg{width:17px;height:17px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 15px;border-radius:9px;border:1px solid var(--border);background:var(--surface);font-weight:600;color:var(--text);white-space:nowrap}
+.btn:hover{border-color:var(--border-strong)} .btn svg{width:16px;height:16px;flex:none} .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)} .btn.primary:disabled{opacity:.55;cursor:not-allowed}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px} .btn.ghost{padding:6px 11px;font-size:12.5px;color:var(--text-dim)} .btn.ghost:hover{color:var(--accent);border-color:var(--accent)} .btn.danger:hover{border-color:var(--bad);color:var(--bad)}
 .content{padding:26px 28px 60px;max-width:1240px;width:100%}
 .view{display:none} .view.active{display:block}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:17px 18px;box-shadow:var(--shadow)}
-.tile .k{color:var(--text-dim);font-size:12.5px;font-weight:500}
-.tile .v{font-size:30px;font-weight:680;letter-spacing:-.02em;margin-top:9px;line-height:1}
-.tile .m{font-size:12px;color:var(--text-faint);margin-top:7px}
-.cards{display:grid;grid-template-columns:1.55fr 1fr;gap:16px}
-@media(max-width:900px){.cards{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile .k{color:var(--text-dim);font-size:12.5px;font-weight:500} .tile .v{font-size:30px;font-weight:680;letter-spacing:-.02em;margin-top:9px;line-height:1} .tile .m{font-size:12px;color:var(--text-faint);margin-top:7px}
+.cards{display:grid;grid-template-columns:1.55fr 1fr;gap:16px} @media(max-width:900px){.cards{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,1fr)}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
-.card>header{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--border)}
-.card>header h2{font-size:13.5px;font-weight:650;margin:0}
-.card>header .count{font-size:11.5px;color:var(--text-dim);background:var(--surface-2);border-radius:20px;padding:1px 9px;font-weight:600}
-.card>header .grow{flex:1}
-.pad{padding:18px}
-.meter{display:flex;height:10px;border-radius:20px;overflow:hidden;margin:2px 0 16px;gap:2px}
-.meter i{display:block;min-width:2px}
-.legend{display:flex;flex-direction:column;gap:11px}
-.legend .row{display:flex;align-items:center;gap:10px;font-size:13px}
-.legend .row .sw{width:9px;height:9px;border-radius:3px;flex:none}
-.legend .row .n{margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums}
-.tablewrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.card>header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.card>header svg.hi{width:15px;height:15px;color:var(--text-dim);flex:none}
+.card>header h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:650;margin:0}
+.card>header .count{font-size:11px;color:var(--text-dim);background:var(--surface-2);border-radius:20px;padding:1px 8px;font-weight:600} .card>header .grow{flex:1} .card>header .rep{margin-left:auto}
+.pad{padding:16px 18px}
+.rep{background:var(--accent-weak);color:var(--accent);border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.meter{display:flex;height:10px;border-radius:20px;overflow:hidden;margin:2px 0 16px;gap:2px} .meter i{display:block;min-width:2px}
+.legend{display:flex;flex-direction:column;gap:11px} .legend .row{display:flex;align-items:center;gap:10px;font-size:13px} .legend .row .sw{width:9px;height:9px;border-radius:3px;flex:none} .legend .row .n{margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto} table{width:100%;border-collapse:collapse;font-size:13.5px}
 thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:650;padding:11px 18px;border-bottom:1px solid var(--border);white-space:nowrap}
-tbody td{padding:12px 18px;border-bottom:1px solid var(--border);vertical-align:middle}
-tbody tr:last-child td{border-bottom:0}
+tbody td{padding:12px 18px;border-bottom:1px solid var(--border);vertical-align:middle} tbody tr:last-child td{border-bottom:0}
 tr.click{cursor:pointer} tr.click:hover{background:var(--surface-2)}
-.dev{display:flex;align-items:center;gap:11px}
-.dev .av{width:32px;height:32px;border-radius:8px;background:var(--surface-3);display:grid;place-items:center;color:var(--text-dim);flex:none}
-.dev .av svg{width:16px;height:16px} .dev .nm{font-weight:600}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
-.pill .d{width:6px;height:6px;border-radius:50%}
+.dev{display:flex;align-items:center;gap:11px} .dev .av{width:32px;height:32px;border-radius:8px;background:var(--surface-3);display:grid;place-items:center;color:var(--text-dim);flex:none} .dev .av svg{width:16px;height:16px} .dev .nm{font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap} .pill .d{width:6px;height:6px;border-radius:50%}
 .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.ok .d{background:var(--ok)}
 .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.warn .d{background:var(--warn)}
 .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.bad .d{background:var(--bad)}
 .pill.idle{background:var(--idle-bg);color:var(--idle)} .pill.idle .d{background:var(--idle)}
 .pill.acc{background:var(--accent-weak);color:var(--accent)} .pill.acc .d{background:var(--accent)}
-.tag{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--text-dim);font-size:11.5px;font-family:var(--mono)}
-.muted{color:var(--text-faint)} .right{text-align:right}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--text-dim);font-size:11.5px;font-family:var(--mono)} .tag.role{background:var(--accent-weak);color:var(--accent);font-family:var(--sans);font-weight:600}
 .form{padding:18px;display:flex;flex-direction:column;gap:14px}
 label .l,.lbl2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);font-weight:650;display:block;margin-bottom:6px}
 select,input,textarea{width:100%;font:inherit;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
-select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--surface)}
-textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
-.msg{padding:10px 13px;border-radius:8px;font-size:13px;display:none}
-.msg.show{display:block}
-.msg.ok{background:var(--ok-bg);color:var(--ok)} .msg.err{background:var(--bad-bg);color:var(--bad)}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--surface)} textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
+.msg{padding:10px 13px;border-radius:8px;font-size:13px;display:none} .msg.show{display:block} .msg.ok{background:var(--ok-bg);color:var(--ok)} .msg.err{background:var(--bad-bg);color:var(--bad)}
 .empty{padding:26px 18px;color:var(--text-faint);text-align:center;font-size:13px}
-.srcrow{display:flex;align-items:center;gap:13px;padding:14px 18px;border-bottom:1px solid var(--border)}
-.srcrow:last-child{border-bottom:0} .srcrow .grow{flex:1;min-width:0} .srcrow .nm{font-weight:650}
-.scrim{position:fixed;inset:0;background:rgba(8,14,22,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
-.scrim.open{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;right:0;height:100vh;width:min(480px,96vw);background:var(--surface);border-left:1px solid var(--border);box-shadow:-20px 0 50px -24px rgba(0,0,0,.5);transform:translateX(100%);transition:transform .24s cubic-bezier(.4,0,.2,1);z-index:41;display:flex;flex-direction:column}
-.drawer.open{transform:none}
-.drawer header{display:flex;align-items:flex-start;gap:12px;padding:20px;border-bottom:1px solid var(--border)}
-.drawer header .nm{font-size:17px;font-weight:680} .drawer header .id{font-size:12px;color:var(--text-faint);margin-top:3px}
-.drawer .body{overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:22px}
-.kv{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.kv .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);font-weight:600}
-.kv .v{margin-top:4px;font-weight:600;word-break:break-word}
-.sec .h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);font-weight:650;margin-bottom:11px;display:flex;align-items:center;gap:8px}
-.sec .h .count{background:var(--surface-2);border-radius:20px;padding:0 8px;font-weight:600}
-.box{border:1px solid var(--border);border-radius:10px;padding:13px 14px}
-.tl{position:relative;padding-left:20px;display:flex;flex-direction:column;gap:14px}
-.tl::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:2px;background:var(--border)}
-.tl .ev{position:relative}
-.tl .ev::before{content:"";position:absolute;left:-20px;top:3px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.tl .ev.ok::before{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)}
-.tl .ev.bad::before{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
-.tl .ev .t{font-weight:600;font-size:13px} .tl .ev .d{font-size:11.5px;color:var(--text-faint);margin-top:2px}
-.pkgs{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:10px}
-.pkgs .p{display:flex;justify-content:space-between;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:12.5px}
-.pkgs .p:last-child{border-bottom:0} .pkgs .p .v{color:var(--text-faint);font-family:var(--mono)}
-.actions{display:flex;gap:10px;padding:16px 20px;border-top:1px solid var(--border)}
-.modal{position:fixed;inset:0;display:none;place-items:start center;padding:70px 16px;background:rgba(8,14,22,.55);z-index:50}
-.modal.open{display:grid}
+.srcrow{display:flex;align-items:center;gap:13px;padding:14px 18px;border-bottom:1px solid var(--border)} .srcrow:last-child{border-bottom:0} .srcrow .grow{flex:1;min-width:0} .srcrow .nm{font-weight:650}
+.modal{position:fixed;inset:0;display:none;place-items:start center;padding:70px 16px;background:rgba(8,14,22,.55);z-index:50} .modal.open{display:grid}
 .modal .m{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);width:min(720px,100%);overflow:hidden}
-.modal .m header{display:flex;align-items:center;padding:17px 20px;border-bottom:1px solid var(--border)}
-.modal .m header h3{margin:0;font-size:16px;font-weight:680}
+.modal .m header{display:flex;align-items:center;padding:17px 20px;border-bottom:1px solid var(--border)} .modal .m header h3{margin:0;font-size:16px;font-weight:680}
 .cmd{font-family:var(--mono);font-size:12.5px;background:#0a1119;color:#d6e2f0;border-color:#1d2a3a;white-space:pre-wrap;word-break:break-all}
-.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-weight:600;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:60}
-.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-weight:600;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:60} .toast.show{opacity:1;transform:translate(-50%,0)}
+/* ---- device detail ---- */
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;text-decoration:none;margin-bottom:16px;cursor:pointer} .back:hover{color:var(--text)} .back svg{width:16px;height:16px}
+.dhdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
+.dhdr .av{width:52px;height:52px;border-radius:13px;background:var(--surface-3);display:grid;place-items:center;color:var(--text-dim);flex:none} .dhdr .av svg{width:26px;height:26px}
+.dhdr .g{flex:1;min-width:0} .dhdr .nmrow{display:flex;align-items:center;gap:10px} .dhdr h1{font-size:23px;font-weight:680;letter-spacing:-.02em;margin:0}
+.edit{color:var(--text-faint);padding:3px;border-radius:6px} .edit:hover{color:var(--accent);background:var(--accent-weak)} .edit svg{width:15px;height:15px;display:block}
+.desc{color:var(--text-dim);font-size:13.5px;margin-top:5px} .desc.empty{font-style:italic;color:var(--text-faint)}
+.dmeta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:12.5px;color:var(--text-faint)} .dmeta b{color:var(--text-dim);font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:3px 11px;font-size:12px;color:var(--text-dim);font-weight:500}
+.chip .x{color:var(--text-faint);font-weight:700;cursor:pointer;line-height:1} .chip .x:hover{color:var(--bad)} .chip.add{border-style:dashed;color:var(--accent);cursor:pointer;background:none}
+.dactions{display:flex;gap:10px;flex:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px} @media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.ecu{display:flex;align-items:center;gap:13px;padding:14px 18px;border-bottom:1px solid var(--border)} .ecu:last-child{border-bottom:0}
+.ecu .ic{width:38px;height:38px;border-radius:10px;flex:none;display:grid;place-items:center} .ecu .ic.prim{background:var(--accent-weak);color:var(--accent)} .ecu .ic.sec{background:var(--surface-2);color:var(--text-dim)} .ecu .ic svg{width:19px;height:19px}
+.ecu .g{flex:1;min-width:0} .ecu .r1{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .ecu .r1 b{font-weight:650}
+.ecu .r2{font-size:12.5px;color:var(--text-dim);margin-top:3px;word-break:break-word} .ecu .r2.none{color:var(--text-faint);font-style:italic} .ecu .hash{font-size:11.5px;color:var(--text-faint);margin-top:2px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:11px 16px;font-size:13.5px} .kv dt{color:var(--text-faint);white-space:nowrap} .kv dd{margin:0;text-align:right;font-weight:500;min-width:0;overflow-wrap:anywhere}
+.na{background:var(--pending-bg);color:var(--pending);border-radius:6px;padding:1px 8px;font-size:11px;font-weight:600}
+.hwrow{display:flex;align-items:center;gap:13px;padding:12px 18px;border-bottom:1px solid var(--border)} .hwrow:last-child{border-bottom:0}
+.hwrow .ic{width:34px;height:34px;border-radius:9px;background:var(--surface-2);color:var(--text-dim);display:grid;place-items:center;flex:none} .hwrow .ic svg{width:17px;height:17px}
+.hwrow .g{flex:1;min-width:0} .hwrow .t{font-weight:600} .hwrow .s{font-size:12.5px;color:var(--text-dim);margin-top:2px} .hwrow .v{text-align:right;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap} .hwrow.down{opacity:.6} .hwrow.down .v{font-weight:500;color:var(--text-faint)}
+details.disc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:14px 18px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:650} details.disc summary::-webkit-details-marker{display:none}
+details.disc .chev{transition:transform .15s} details.disc[open] .chev{transform:rotate(90deg)} details.disc summary .count{background:var(--surface-2);border-radius:20px;padding:1px 8px;font-size:11px;color:var(--text-dim)}
+.discbody{padding:0 18px 16px} .discbody input{margin-bottom:10px}
+.modlist{display:flex;flex-wrap:wrap;gap:6px} .modchip{background:var(--surface-2);border-radius:6px;padding:2px 8px;font-size:11.5px;font-family:var(--mono);color:var(--text-dim)}
+.pkgtbl{width:100%;border-collapse:collapse;font-size:13px} .pkgtbl td{padding:6px 4px;border-bottom:1px solid var(--border)} .pkgtbl td.v{text-align:right;color:var(--text-dim);font-family:var(--mono)}
+.tl{position:relative;padding:4px 0 4px 20px;display:flex;flex-direction:column;gap:14px} .tl::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.tl .ev{position:relative} .tl .ev::before{content:"";position:absolute;left:-20px;top:3px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.tl .ev.ok::before{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)} .tl .ev.bad::before{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
+.tl .ev .t{font-weight:600;font-size:13px} .tl .ev .d{font-size:11.5px;color:var(--text-faint);margin-top:2px}
+.note{margin:2px 18px 16px;font-size:12.5px;color:var(--text-dim);background:var(--surface-2);border-radius:8px;padding:11px 13px;display:flex;gap:9px;line-height:1.55} .note svg{width:15px;height:15px;flex:none;margin-top:2px;color:var(--text-faint)}
 </style>
 
 <div class="app">
@@ -194,6 +167,8 @@ textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
           <div class="tablewrap" id="devWrap"><div class="empty">Loading…</div></div></div>
       </section>
 
+      <section class="view" id="v-device"><div id="devDetail"></div></section>
+
       <section class="view" id="v-packages">
         <div class="cards" style="grid-template-columns:1.6fr 1fr;align-items:start">
           <div class="card"><header><h2>Your packages</h2><span class="count" id="tgt-count">0</span></header>
@@ -206,7 +181,7 @@ textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
                 <label><span class="l">Hardware id</span><input id="upHw" placeholder="intel-corei7-64"></label>
               </div>
               <div><label><span class="l">Binary file</span><input type="file" id="upFile"></label></div>
-              <button class="btn primary" id="upBtn" onclick="uploadVersion()" style="justify-content:center">Upload →</button>
+              <button class="btn primary" id="upBtn" onclick="uploadVersion()">Upload →</button>
               <div class="msg" id="upMsg"></div>
             </div></div>
         </div>
@@ -222,8 +197,7 @@ textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
             <div class="msg" id="srcMsg"></div>
           </div>
         </div>
-        <div class="card"><header><h2>Browse packages</h2><span class="count" id="pkg-count">0</span>
-          <span class="grow"></span>
+        <div class="card"><header><h2>Browse packages</h2><span class="count" id="pkg-count">0</span><span class="grow"></span>
           <input id="pkgSearch" placeholder="filter — nightly, imx8, camera…" style="width:230px;padding:7px 11px" oninput="browsePackages()">
           <select id="pkgDevice" style="width:auto;padding:7px 11px"></select></header>
           <div id="pkgWrap"><div class="empty">Type to search, or clear to list.</div></div>
@@ -232,20 +206,6 @@ textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
     </div>
   </div>
 </div>
-
-<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
-<aside class="drawer" id="drawer">
-  <header>
-    <div style="flex:1"><div class="nm" id="d-nm">—</div><div class="id mono" id="d-id">—</div></div>
-    <span class="pill idle" id="d-status"><span class="d"></span>—</span>
-    <button class="iconbtn" onclick="closeDrawer()" style="width:32px;height:32px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-  </header>
-  <div class="body" id="d-body"></div>
-  <div class="actions">
-    <select id="d-target" style="flex:1"></select>
-    <button class="btn primary" id="d-deploy" onclick="deployToDevice()">Deploy</button>
-  </div>
-</aside>
 
 <div class="modal" id="provModal" onclick="if(event.target===this)closeProvision()">
   <div class="m">
@@ -256,7 +216,6 @@ textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
       <div><span class="lbl2">Run this on the device as root</span><textarea id="provCmd" class="cmd" rows="3" readonly onclick="this.select()"></textarea></div>
       <button class="btn primary" onclick="copyProvCmd()" style="align-self:start">⧉ Copy command</button>
       <div class="msg" id="provMsg"></div>
-      <div class="muted" style="font-size:12px">The device fetches this script, receives freshly-minted credentials, points itself at this server, and starts aktualizr. It appears in Devices within ~20&nbsp;s.</div>
     </div>
   </div>
 </div>
@@ -266,49 +225,47 @@ textarea{font-family:var(--mono);font-size:12.5px;resize:vertical}
 <script>
 const api=(p,o)=>fetch(p,o).then(async r=>{if(!r.ok)throw new Error((await r.text())||r.status);const t=await r.text();return t?JSON.parse(t):null;});
 const rapi=p=>'/api/reposerver/user_repo/'+p;
+const dapi=p=>'/api/device-registry/'+p;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtTime=t=>t?new Date(t).toLocaleString():'—';
+const relTime=t=>{if(!t)return'—';const s=(Date.now()-new Date(t))/1000;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h ago';return Math.floor(s/86400)+' d ago';};
 const shortHash=h=>h?h.slice(0,12):'';
-let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2400);}
-function showMsg(el,cls,txt){el.className='msg show '+cls;el.textContent=txt;}
+const bytes=n=>{n=+n;if(!n||n<0)return null;const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (n>=100?Math.round(n):n.toFixed(1))+' '+u[i];};
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600);}
+function showMsg(el,cls,txt){if(el){el.className='msg show '+cls;el.textContent=txt;}}
 function setStatus(up){document.getElementById('dot').className='dot '+(up?'up':'down');document.getElementById('status').textContent=up?('connected · '+location.host):'backend unreachable';}
-// status -> pill class
 function pillClass(s){return s==='UpToDate'?'ok':(s==='Outdated'||s==='UpdatePending'||s==='UpdateScheduled')?'warn':(s==='Error')?'bad':'idle';}
+let DEVICES=[], INSTALLED={}, TARGETS=[], PKGS=[];
 
-let DEVICES=[], INSTALLED={}, TARGETS=[], SOURCES=[], PKGS=[];
-
-// ---------- nav ----------
-const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],packages:['Packages','Software versions you host on this cloud'],sources:['Package Sources','External TUF delegations you trust']};
+const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Software versions you host on this cloud'],sources:['Package Sources','External TUF delegations you trust']};
 function go(v){document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
-  document.getElementById('ptitle').textContent=TITLES[v][0];document.getElementById('psub').textContent=TITLES[v][1];window.scrollTo(0,0);}
+  const tt2=TITLES[v]||TITLES.devices;document.getElementById('ptitle').textContent=tt2[0];document.getElementById('psub').textContent=tt2[1];window.scrollTo(0,0);}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-view]');if(a){e.preventDefault();go(a.dataset.view);}});
 function toggleTheme(){const r=document.documentElement;const cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',cur==='dark'?'light':'dark');}
 
-// ---------- devices ----------
+// ---------- devices list ----------
 async function loadDevices(){
-  const d=await api('/api/device-registry/devices'); DEVICES=d.values||[];
+  const d=await api(dapi('devices')); DEVICES=d.values||[];
   await Promise.all(DEVICES.map(async dev=>{try{const ecus=await api('/api/director/admin/devices/'+dev.uuid+'/ecus');
-    const pri=(ecus||[]).find(e=>e.primary)||(ecus||[])[0]; INSTALLED[dev.uuid]=pri&&pri.image?pri.image:null;}catch(e){INSTALLED[dev.uuid]=null;}}));
+    INSTALLED[dev.uuid]=ecus||[];}catch(e){INSTALLED[dev.uuid]=[];}}));
   renderDevices();
 }
-function verOf(uuid){const im=INSTALLED[uuid];if(!im||!im.filepath)return null;const f=im.filepath;return f.split('/').pop();}
+function primaryOf(uuid){return (INSTALLED[uuid]||[]).find(e=>e.primary)||(INSTALLED[uuid]||[])[0]||null;}
+function verOf(uuid){const p=primaryOf(uuid);const f=p&&p.image&&p.image.filepath;return (f&&f!=='unknown')?f.split('/').pop():null;}
+function hwOf(uuid){const p=primaryOf(uuid);return p?p.hardwareId:'';}
+const avatar='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
 function renderDevices(){
-  document.getElementById('nav-dev').textContent=DEVICES.length;
-  document.getElementById('dev-count').textContent=DEVICES.length;
-  const rows=DEVICES.map(d=>{const v=verOf(d.uuid);const hw=(INSTALLED[d.uuid]||{}).filepath;const hwid=hw?hw.split('/')[1]:'';
-    return `<tr class="click" onclick="openDrawer('${esc(d.uuid)}')">
-      <td><div class="dev"><span class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><div class="nm">${esc(d.deviceName||d.deviceId)}</div></div></td>
+  document.getElementById('nav-dev').textContent=DEVICES.length; document.getElementById('dev-count').textContent=DEVICES.length;
+  const row=d=>`<tr class="click" onclick="openDevice('${esc(d.uuid)}')">
+      <td><div class="dev"><span class="av">${avatar}</span><div class="nm">${esc(d.deviceName||d.deviceId)}</div></div></td>
       <td><span class="pill ${pillClass(d.deviceStatus)}"><span class="d"></span>${esc(d.deviceStatus||'—')}</span></td>
-      <td>${hwid?`<span class="tag">${esc(hwid)}</span>`:'<span class="muted">—</span>'}</td>
-      <td class="mono">${v?esc(v):'<span class="muted">—</span>'}</td>
-      <td class="muted">${fmtTime(d.lastSeen)}</td></tr>`;}).join('');
-  const table=DEVICES.length?`<table><thead><tr><th>Device</th><th>Status</th><th>Hardware</th><th>Installed version</th><th>Last seen</th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="empty">No devices provisioned yet. Click “Provision device”.</div>';
-  document.getElementById('devWrap').innerHTML=table;
-  // dashboard preview (first 6)
-  const prev=DEVICES.slice(0,6).map(d=>`<tr class="click" onclick="openDrawer('${esc(d.uuid)}')"><td><div class="dev"><span class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><div class="nm">${esc(d.deviceName||d.deviceId)}</div></div></td><td><span class="pill ${pillClass(d.deviceStatus)}"><span class="d"></span>${esc(d.deviceStatus||'—')}</span></td><td class="mono">${verOf(d.uuid)?esc(verOf(d.uuid)):'<span class="muted">—</span>'}</td></tr>`).join('');
+      <td>${hwOf(d.uuid)?`<span class="tag">${esc(hwOf(d.uuid))}</span>`:'<span class="muted">—</span>'}</td>
+      <td class="mono">${verOf(d.uuid)?esc(verOf(d.uuid)):'<span class="muted">—</span>'}</td>
+      <td class="muted">${relTime(d.lastSeen)}</td></tr>`;
+  document.getElementById('devWrap').innerHTML=DEVICES.length?`<table><thead><tr><th>Device</th><th>Status</th><th>Hardware</th><th>Installed version</th><th>Last seen</th></tr></thead><tbody>${DEVICES.map(row).join('')}</tbody></table>`:'<div class="empty">No devices provisioned yet. Click “Provision device”.</div>';
+  const prev=DEVICES.slice(0,6).map(d=>`<tr class="click" onclick="openDevice('${esc(d.uuid)}')"><td><div class="dev"><span class="av">${avatar}</span><div class="nm">${esc(d.deviceName||d.deviceId)}</div></div></td><td><span class="pill ${pillClass(d.deviceStatus)}"><span class="d"></span>${esc(d.deviceStatus||'—')}</span></td><td class="mono">${verOf(d.uuid)?esc(verOf(d.uuid)):'<span class="muted">—</span>'}</td></tr>`).join('');
   document.getElementById('dash-devs').innerHTML=DEVICES.length?`<table><thead><tr><th>Device</th><th>Status</th><th>Version</th></tr></thead><tbody>${prev}</tbody></table>`:'<div class="empty">No devices yet.</div>';
-  // tiles + fleet
   const by={}; DEVICES.forEach(d=>{const c=pillClass(d.deviceStatus);by[c]=(by[c]||0)+1;});
   const utd=DEVICES.length?Math.round(100*(by.ok||0)/DEVICES.length):0;
   document.getElementById('t-dev').textContent=DEVICES.length; document.getElementById('t-dev2').textContent=DEVICES.length;
@@ -316,160 +273,232 @@ function renderDevices(){
   document.getElementById('t-utd').textContent=utd+'%'; document.getElementById('t-utd-m').textContent=`${by.ok||0} of ${DEVICES.length} on target`;
   const seg=(c,col)=>by[c]?`<i style="flex:${by[c]};background:${col}"></i>`:'';
   document.getElementById('fleet').innerHTML=(DEVICES.length?`<div class="meter">${seg('ok','var(--ok)')}${seg('warn','var(--warn)')}${seg('bad','var(--bad)')}${seg('idle','var(--idle)')}</div>`:'')+
-    `<div class="legend">
-      <div class="row"><span class="sw" style="background:var(--ok)"></span> Up to date <span class="n num">${by.ok||0}</span></div>
+    `<div class="legend"><div class="row"><span class="sw" style="background:var(--ok)"></span> Up to date <span class="n num">${by.ok||0}</span></div>
       <div class="row"><span class="sw" style="background:var(--warn)"></span> Updating / outdated <span class="n num">${by.warn||0}</span></div>
       <div class="row"><span class="sw" style="background:var(--bad)"></span> Error <span class="n num">${by.bad||0}</span></div>
       <div class="row"><span class="sw" style="background:var(--idle)"></span> Not seen <span class="n num">${by.idle||0}</span></div></div>`;
   fillPkgDevice();
 }
 
-// ---------- device drawer ----------
-let DRAWER_UUID=null, DRAWER_PKGS=[];
-async function openDrawer(uuid){
-  DRAWER_UUID=uuid; const d=DEVICES.find(x=>x.uuid===uuid)||{};
-  document.getElementById('scrim').classList.add('open'); document.getElementById('drawer').classList.add('open');
-  document.getElementById('d-nm').textContent=d.deviceName||d.deviceId||uuid;
-  document.getElementById('d-id').textContent=uuid;
-  const st=document.getElementById('d-status'); st.className='pill '+pillClass(d.deviceStatus); st.innerHTML='<span class="d"></span>'+esc(d.deviceStatus||'—');
-  document.getElementById('d-body').innerHTML='<div class="empty">Loading…</div>';
-  // target picker for deploy
-  document.getElementById('d-target').innerHTML=TARGETS.map(t=>`<option value="${esc(t.key)}">${esc(t.name)} ${esc(t.version)} · ${esc(t.hw.join(','))}</option>`).join('')||'<option value="">no versions to deploy</option>';
-  const im=INSTALLED[uuid]||{}; const hw=im.filepath?im.filepath.split('/')[1]:'—';
-  const [net,pkgs,events]=await Promise.all([
-    api('/api/device-registry/devices/'+uuid+'/system_info/network').catch(()=>({})),
-    api('/api/device-registry/devices/'+uuid+'/packages?limit=5000').catch(()=>({values:[],total:0})),
-    api('/api/device-registry/devices/'+uuid+'/events').catch(()=>[])
+// ---------- device detail ----------
+let CUR=null;           // {uuid, device, ecus, sysinfo, packages, events}
+const H=svg=>`<svg class="hi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${svg}</svg>`;
+function flat(node,out){ if(!node||typeof node!=='object')return out; if(node.class)out.push(node); (node.children||[]).forEach(c=>flat(c,out)); return out; }
+function ecuRole(e){const hw=(e.hardwareId||'').toLowerCase();
+  if(e.primary)return{label:'Operating system',ic:'<path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/>'};
+  if(hw.includes('docker'))return{label:'Applications',ic:'<path d="M4 7h7v7H4zM13 7h7v4h-7zM13 13h7v4h-7z"/>'};
+  if(hw.includes('boot'))return{label:'Bootloader',ic:'<path d="M6 3h12v4H6zM4 7h16v14H4z"/><path d="M8 12h8M8 16h5"/>'};
+  if(hw.includes('fuse'))return{label:'Secure fuses',ic:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'};
+  return{label:'Subsystem',ic:'<rect x="4" y="7" width="16" height="10" rx="2"/>'};}
+function imgLabel(e){const im=e.image||{};let f=im.filepath||'';
+  if(!f||f==='unknown'||f==='noimage')return null;
+  return f.includes('/')?f.split('/').pop():f;}
+async function openDevice(uuid){
+  CUR={uuid}; go('device');
+  document.getElementById('devDetail').innerHTML='<a class="back" onclick="go(\'devices\')">‹ Devices</a><div class="empty">Loading device…</div>';
+  const d=DEVICES.find(x=>x.uuid===uuid)||{};
+  const [ecus,sys,pkgs,events]=await Promise.all([
+    api('/api/director/admin/devices/'+uuid+'/ecus').catch(()=>[]),
+    api(dapi('devices/'+uuid+'/system_info')).catch(()=>({})),
+    api(dapi('devices/'+uuid+'/packages?limit=5000')).catch(()=>({values:[],total:0})),
+    api(dapi('devices/'+uuid+'/events')).catch(()=>[])
   ]);
-  DRAWER_PKGS=(pkgs.values||[]).map(p=>p.packageId||p);
-  const evs=(Array.isArray(events)?events:[]).slice().reverse().slice(0,12);
-  const evClass=id=>/Completed|Applied|Complete/i.test(id)?'ok':/Fail|Error|Denied/i.test(id)?'bad':'';
-  document.getElementById('d-body').innerHTML=`
-    <div class="kv">
-      <div><div class="l">Hardware</div><div class="v mono">${esc(hw)}</div></div>
-      <div><div class="l">Last seen</div><div class="v">${fmtTime(d.lastSeen)}</div></div>
-      <div><div class="l">Provisioned</div><div class="v">${fmtTime(d.createdAt)}</div></div>
-      <div><div class="l">Type</div><div class="v">${esc(d.deviceType||'—')}</div></div>
+  CUR={uuid,device:d,ecus:ecus||[],sys:sys||{},packages:(pkgs.values||[]).map(p=>p.packageId||p),events:Array.isArray(events)?events:[]};
+  renderDetail();
+}
+function renderDetail(){
+  const {uuid,device:d,ecus,sys,packages,events}=CUR;
+  const o=sys.ota_report||{}; const nodes=flat(sys,[]);
+  const board=(nodes.find(n=>n.class==='system')||{}).product || o.device_tree || hwOf(uuid) || '—';
+  const procs=nodes.filter(n=>n.class==='processor' && /cpu/i.test((n.product||'')+(n.description||'')) && !/idle|cache/i.test((n.product||'')+(n.id||'')));
+  let cores=procs.reduce((a,n)=>a+(parseInt((n.configuration||{}).cores)||0),0); if(!cores)cores=procs.length;
+  const freqHz=procs.map(n=>+n.size||+n.capacity||0).filter(Boolean).sort((a,b)=>b-a)[0];
+  const freq=freqHz?(freqHz/1e9).toFixed(1)+' GHz':'';
+  const cpuModel=procs.map(n=>n.product).find(p=>p && !/^cpu$/i.test(p)) || (cores?cores+'× core'+(cores>1?'s':''):'—');
+  const memNode=nodes.find(n=>n.class==='memory' && /system memory/i.test(n.description||'')) || nodes.find(n=>n.class==='memory'&&n.size>1e8);
+  const mem=memNode?bytes(memNode.size):null;
+  const serial=(o.usb&&'') || (sys.serial) || ((nodes.find(n=>n.class==='system')||{}).serial) || (device.deviceId||'').split('-').pop();
+  const pri=primaryOf(uuid)||{};
+  const osname=o.os_name||'Torizon OS'; const osver=o.os_version||verOf(uuid)||'';
+  const tags=Object.keys((d.attributes)||{});
+  const emmc=(o.block_devices||[]).find(b=>b.tran==='mmc'&&/mmcblk\d$/.test(b.name||''));
+  const usbDevs=(o.usb||[]).filter(s=>!/root hub|Hub Controller|Hub$/i.test(s));
+  const usbAll=(o.block_devices||[]).filter(b=>b.tran==='usb');
+  const nics=o.interfaces||[];
+  const na='<span class="na">not reported yet</span>';
+  const evClass=id=>/Completed|Applied|Complete|Success/i.test(id)?'ok':/Fail|Error|Denied/i.test(id)?'bad':'';
+  const evs=events.slice().reverse().slice(0,12);
+
+  const subsystems=ecus.map(e=>{const r=ecuRole(e);const img=imgLabel(e);const h=e.image&&e.image.hash&&e.image.hash.sha256;
+    return `<div class="ecu"><span class="ic ${e.primary?'prim':'sec'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${r.ic}</svg></span>
+      <div class="g"><div class="r1"><b>${esc(r.label)}</b>${e.primary?'<span class="tag role">primary</span>':''}<span class="tag">${esc(e.hardwareId)}</span></div>
+        ${e.primary?`<div class="r2">${esc(osname)} · ${esc(osver||'—')}</div>`:(img?`<div class="r2 mono">${esc(img)}</div>`:'<div class="r2 none">No image deployed</div>')}
+        ${h&&e.primary?`<div class="hash mono">ostree ${esc(shortHash(h))}…</div>`:''}</div>
+      <button class="btn ghost" onclick="deployPrompt('${esc(e.hardwareId)}')">Update</button></div>`;}).join('');
+
+  const netRows=nics.filter(s=>!/^lo /.test(s)&&!/^(docker|veth|br-|sit0)/.test(s)).map(s=>{const [nm,st]=s.split(' ');
+    const isUp=/UP/i.test(st);const kind=/wl|mlan/i.test(nm)?'Wi-Fi':/can/i.test(nm)?'CAN bus':'Ethernet';
+    return `<div class="hwrow ${isUp?'':'down'}"><span class="ic">${netIcon(kind)}</span><div class="g"><div class="t">${esc(kind)} — ${esc(nm)}</div></div><div class="v">${isUp?'up':'down'}</div></div>`;}).join('');
+
+  document.getElementById('devDetail').innerHTML=`
+    <a class="back" onclick="go('devices')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Devices</a>
+    <div class="dhdr">
+      <span class="av">${avatar}</span>
+      <div class="g">
+        <div class="nmrow"><h1 id="dd-name">${esc(d.deviceName||d.deviceId||uuid)}</h1>
+          <button class="edit" title="Rename" onclick="renameDevice()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div>
+        <div class="desc ${d.notes?'':'empty'}" onclick="editNotes()" title="Edit description">${d.notes?esc(d.notes):'Add a description…'} <button class="edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div>
+        <div class="dmeta">
+          <span><b>Status</b> <span class="pill ${pillClass(d.deviceStatus)}"><span class="d"></span>${esc(d.deviceStatus||'—')}</span></span>
+          <span><b>Board</b> ${esc(board)}</span>
+          ${serial?`<span><b>Serial</b> <span class="mono">${esc(serial)}</span></span>`:''}
+          <span><b>Last seen</b> ${relTime(d.lastSeen)}</span>
+          <span><b>UUID</b> <span class="mono">${esc(uuid.slice(0,8))}…</span></span>
+        </div>
+        <div class="tags" id="dd-tags">${tags.map(t=>`<span class="chip">${esc(t)} <span class="x" onclick="removeTag('${esc(t)}')">×</span></span>`).join('')}<span class="chip add" onclick="addTag()">+ Add tag</span></div>
+      </div>
+      <div class="dactions">
+        <button class="btn primary" onclick="deployPrompt('${esc(hwOf(uuid))}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Deploy update</button>
+        <button class="btn" onclick="toast('Rollback isn\\'t wired yet — coming soon')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Roll back</button>
+      </div>
     </div>
-    <div class="sec"><div class="h">Installed image</div>
-      <div class="box">${im.filepath?`<div class="mono" style="font-size:12.5px;word-break:break-all">${esc(im.filepath.split('/').pop())}</div><div class="mono muted" style="font-size:12px;margin-top:5px">ostree ${esc(shortHash(im.hash&&im.hash.sha256))}…</div>`:'<span class="muted">No image reported</span>'}</div></div>
-    <div class="sec"><div class="h">Network</div>
-      <div class="box"><div class="kv"><div><div class="l">IP</div><div class="v mono">${esc(net.local_ipv4||'—')}</div></div><div><div class="l">Hostname</div><div class="v mono">${esc(net.hostname||'—')}</div></div><div style="grid-column:1/3"><div class="l">MAC</div><div class="v mono">${esc(net.mac||'—')}</div></div></div></div></div>
-    <div class="sec"><div class="h">Update history <span class="count">${evs.length}</span></div>
-      ${evs.length?`<div class="tl">${evs.map(e=>`<div class="ev ${evClass(e.eventType&&e.eventType.id)}"><div class="t">${esc((e.eventType&&e.eventType.id)||'event')}</div><div class="d">${fmtTime(e.deviceTime)}</div></div>`).join('')}</div>`:'<div class="box muted">No events yet.</div>'}</div>
-    <div class="sec"><div class="h">Installed packages <span class="count" id="d-pkgcount">${DRAWER_PKGS.length}</span></div>
-      <input id="d-pkgfilter" placeholder="filter packages…" oninput="renderDrawerPkgs()" style="margin-bottom:10px">
-      <div class="pkgs" id="d-pkgs"></div></div>`;
-  renderDrawerPkgs();
+
+    <div class="card"><header>${H('<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>')}<h2>Subsystems</h2><span class="count">${ecus.length} ECUs</span></header>
+      ${ecus.length?subsystems:'<div class="empty">No ECUs reported.</div>'}
+      <div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Each subsystem is an independently-updatable Uptane ECU. <b>Update</b> assigns a target matching that ECU's hardware id.</span></div></div>
+
+    <div class="grid2">
+      <div class="card"><header>${H('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18M3 12h18"/>')}<h2>Operating system</h2></header>
+        <div class="pad"><dl class="kv">
+          <dt>Name</dt><dd>${esc(osname)}</dd>
+          <dt>Version</dt><dd class="mono">${esc(osver||'—')}</dd>
+          <dt>Variant</dt><dd>${esc(o.os_variant||'—')}</dd>
+          <dt>Kernel</dt><dd class="mono">${o.kernel?esc(o.kernel):na}</dd>
+          <dt>OSTree</dt><dd class="mono">${pri.image&&pri.image.hash?esc(shortHash(pri.image.hash.sha256))+'…':na}</dd>
+        </dl></div></div>
+
+      <div class="card"><header>${H('<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>')}<h2>Hardware</h2></header>
+        <div class="pad"><dl class="kv">
+          <dt>System</dt><dd>${esc(board)}</dd>
+          <dt>CPU</dt><dd>${esc(cpuModel)}${freq?' · '+esc(freq):''}</dd>
+          <dt>Cores</dt><dd>${cores||na}</dd>
+          <dt>Memory</dt><dd>${mem||na}</dd>
+          <dt>CPU governor</dt><dd>${o.cpu_governor?esc(o.cpu_governor):na}</dd>
+          <dt>Last boot</dt><dd>${o.last_boot?relTime(o.last_boot):na}</dd>
+        </dl></div></div>
+    </div>
+
+    <div class="card"><header>${H('<rect x="7" y="7" width="10" height="10" rx="1"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>')}<h2>Kernel &amp; boot</h2>${o.kernel?'<span class="rep">reporter</span>':''}</header>
+      <div class="pad"><dl class="kv">
+        <dt>Kernel</dt><dd class="mono">${o.kernel?esc(o.kernel):na}</dd>
+        <dt>Architecture</dt><dd>${o.arch?esc(o.arch):na}</dd>
+        <dt>Build</dt><dd class="mono" style="font-size:12px">${o.kernel_build?esc(o.kernel_build):na}</dd>
+        <dt>Device tree</dt><dd>${o.device_tree?esc(o.device_tree):na}</dd>
+      </dl>
+      ${(o.modules&&o.modules.length)?`<details class="disc" style="margin-top:12px"><summary><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="12" height="12"><path d="M9 6l6 6-6 6"/></svg>Loaded modules <span class="count">${o.modules.length}</span></summary><div class="modlist" style="padding-top:10px">${o.modules.slice(0,60).map(m=>`<span class="modchip">${esc(m)}</span>`).join('')}${o.modules.length>60?`<span class="modchip muted">… ${o.modules.length-60} more</span>`:''}</div></details>`:''}
+      ${o.kernel_cmdline?`<details class="disc"><summary><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="12" height="12"><path d="M9 6l6 6-6 6"/></svg>Kernel command line</summary><div class="mono muted" style="font-size:12px;padding-top:8px;overflow-wrap:anywhere">${esc(o.kernel_cmdline)}</div></details>`:''}
+      </div></div>
+
+    <div class="card"><header>${H('<rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M6 12h.01M10 12h.01"/>')}<h2>Storage, network &amp; peripherals</h2></header>
+      ${emmc?`<div class="hwrow"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v8H8z"/></svg></span><div class="g"><div class="t">${/mmc/.test(emmc.tran)?'eMMC':'Disk'} — ${esc(emmc.name)}</div><div class="s">${esc((emmc.mountpoints||[]).filter(Boolean).join(', ')||'internal storage')}</div></div><div class="v">${esc(emmc.size||'')}</div></div>`:''}
+      ${netRows}
+      ${usbAll.map(b=>`<div class="hwrow"><span class="ic" style="background:var(--accent-weak);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v14"/><path d="M8 6l4-4 4 4"/><rect x="6" y="16" width="12" height="6" rx="2"/></svg></span><div class="g"><div class="t">USB storage — ${esc(b.name)} <span class="tag" style="background:var(--accent-weak);color:var(--accent)">attached</span></div><div class="s">${esc(b.model||'').trim()||'USB mass storage'}</div></div><div class="v">${esc(b.size||'')}</div></div>`).join('')}
+      <div class="hwrow"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v14"/><path d="M8 6l4-4 4 4"/><rect x="6" y="16" width="12" height="6" rx="2"/></svg></span><div class="g"><div class="t">USB devices</div><div class="s">${usbDevs.length?esc(usbDevs.map(s=>s.replace(/^Bus.*ID \S+ /,'')).join(' · ')):'root hubs only'}</div></div><div class="v muted" style="font-weight:500">${(o.usb||[]).length}</div></div>
+      ${o.kernel?'<div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Peripherals refresh via the on-device reporter (USB hot-plug + timer).</span></div>':''}</div>
+
+    <details class="card disc"><summary>${H('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>')}Installed packages <span class="count">${packages.length}</span><span class="grow"></span></summary>
+      <div class="discbody"><input id="dd-pkgfilter" placeholder="filter packages…" oninput="renderPkgs()"><table class="pkgtbl" id="dd-pkgtbl"></table></div></details>
+
+    <div class="card"><header>${H('<path d="M3 3v6h6"/><path d="M3 9a9 9 0 1 0 3-6"/><path d="M12 8v4l3 2"/>')}<h2>Update history</h2><span class="count">${evs.length}</span></header>
+      <div class="pad">${evs.length?`<div class="tl">${evs.map(e=>`<div class="ev ${evClass((e.eventType&&e.eventType.id)||'')}"><div class="t">${esc((e.eventType&&e.eventType.id)||'event')}</div><div class="d">${fmtTime(e.deviceTime)}</div></div>`).join('')}</div>`:'<div class="empty">No events yet.</div>'}</div></div>`;
+  renderPkgs();
 }
-function renderDrawerPkgs(){
-  const f=(document.getElementById('d-pkgfilter')?.value||'').toLowerCase();
-  const list=DRAWER_PKGS.filter(p=>!f||(p.name||'').toLowerCase().includes(f)).slice(0,300);
-  document.getElementById('d-pkgcount').textContent=DRAWER_PKGS.length;
-  document.getElementById('d-pkgs').innerHTML=list.length?list.map(p=>`<div class="p"><span>${esc(p.name)}</span><span class="v">${esc(p.version)}</span></div>`).join(''):'<div class="empty">No matching packages.</div>';
-}
-function closeDrawer(){document.getElementById('scrim').classList.remove('open');document.getElementById('drawer').classList.remove('open');}
-async function deployToDevice(){
-  const key=document.getElementById('d-target').value; const t=TARGETS.find(x=>x.key===key);
-  if(!DRAWER_UUID||!t)return toast('Pick a version to deploy.');
-  const hw=t.hw[0]; if(!hw)return toast('Target has no hardware id.');
-  const btn=document.getElementById('d-deploy'); btn.disabled=true;
-  try{
-    const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targets:{[hw]:{to:{target:t.key,checksum:{method:'sha256',hash:t.hash},targetLength:t.length},targetFormat:'BINARY',generateDiff:false}}})})).replace(/"/g,'');
-    const res=await api('/api/director/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correlationId:'urn:here-ota:mtu:'+mtu,mtuId:mtu,devices:[DRAWER_UUID]})});
-    toast(res&&res.affected&&res.affected.length?('✓ '+t.name+' '+t.version+' assigned'):'Device not affected (hw mismatch or already installed)');
-    setTimeout(refreshAll,900);
-  }catch(e){toast('Deploy failed: '+e.message);}finally{btn.disabled=false;}
+function netIcon(kind){return kind==='Wi-Fi'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01"/></svg>':kind==='CAN bus'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 12h4l2-3 4 6 2-3h4"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M6 9V6M18 9V6"/></svg>';}
+function renderPkgs(){const el=document.getElementById('dd-pkgtbl');if(!el)return;const f=(document.getElementById('dd-pkgfilter')?.value||'').toLowerCase();
+  const list=CUR.packages.filter(p=>!f||(p.name||'').toLowerCase().includes(f)).slice(0,400);
+  el.innerHTML=list.length?list.map(p=>`<tr><td>${esc(p.name)}</td><td class="v">${esc(p.version)}</td></tr>`).join(''):'<tr><td class="muted">No matching packages.</td></tr>';}
+
+// ---------- device mutations ----------
+async function patchDevice(body,okmsg){try{await api(dapi('devices/'+CUR.uuid),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const i=DEVICES.findIndex(x=>x.uuid===CUR.uuid);if(i>=0)Object.assign(DEVICES[i],body);Object.assign(CUR.device,body);renderDetail();renderDevices();toast(okmsg);}
+  catch(e){toast('Failed: '+e.message);}}
+function renameDevice(){const n=prompt('Device name:',CUR.device.deviceName||'');if(n==null)return;const v=n.trim();if(!v||v===CUR.device.deviceName)return;patchDevice({deviceName:v},'Renamed');}
+function editNotes(){const n=prompt('Description:',CUR.device.notes||'');if(n==null)return;patchDevice({notes:n.trim()},'Description saved');}
+async function addTag(){const t=(prompt('Add a tag (keyword):','')||'').trim();if(!t)return;
+  try{await api(dapi('devices/'+CUR.uuid+'/device_tags'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({tagId:t,tagValue:'true'})});
+    CUR.device.attributes=Object.assign({},CUR.device.attributes,{[t]:'true'});renderDetail();toast('Tag added');}
+  catch(e){toast('Tags need a tag definition first — noted, wiring later. ('+e.message.slice(0,40)+')');}}
+function removeTag(t){toast('Tag removal wiring coming soon');}
+
+// ---------- deploy (own + delegated, per hardware id) ----------
+async function deployPrompt(hwid){
+  const cands=[];
+  TARGETS.filter(t=>!hwid||t.hw.includes(hwid)).forEach(t=>cands.push({label:t.name+' '+t.version+' (yours)',target:t.key,hash:t.hash,len:t.length,hw:t.hw[0]}));
+  // delegated for this hw
+  try{const di=await api(rapi('delegations_items?nameContains='+encodeURIComponent(hwid||'')));(di.values||di||[]).forEach(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{};
+    if(!hwid||(c.hardwareIds||[]).includes(hwid))cands.push({label:it.targetFilename.split('/').pop()+' (source)',target:it.targetFilename,hash:h.sha256,len:(it.clientTargetItem&&it.clientTargetItem.length)||0,uri:c.uri,hw:(c.hardwareIds||[])[0]});});}catch(e){}
+  if(!cands.length)return toast('No targets available for '+(hwid||'this device'));
+  const menu=cands.map((c,i)=>`${i+1}. ${c.label}`).join('\n');
+  const pick=prompt('Deploy to '+(hwid||'device')+' — choose a target:\n\n'+menu+'\n\nEnter number:','1');
+  const idx=parseInt(pick)-1; if(isNaN(idx)||!cands[idx])return;
+  const c=cands[idx]; const to={target:c.target,checksum:{method:'sha256',hash:c.hash},targetLength:c.len||0}; if(c.uri)to.uri=c.uri;
+  try{const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targets:{[c.hw||hwid]:{to}}})})).replace(/"/g,'');
+    const res=await api('/api/director/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correlationId:'urn:here-ota:mtu:'+mtu,mtuId:mtu,devices:[CUR.uuid]})});
+    toast(res&&res.affected&&res.affected.length?'✓ Assigned — installs on next check-in':'Device not affected (hw mismatch or already installed)');
+    setTimeout(()=>openDevice(CUR.uuid),1200);
+  }catch(e){toast('Deploy failed: '+e.message);}
 }
 
 // ---------- your packages ----------
-async function loadTargets(){
-  let signed; try{const r=await api(rapi('targets.json'));signed=r.signed||r;}catch(e){TARGETS=[];renderTargets();return;}
-  const t=signed.targets||{};
-  TARGETS=Object.entries(t).map(([k,v])=>({key:k,name:(v.custom&&v.custom.name)||k,version:(v.custom&&v.custom.version)||'',hw:(v.custom&&v.custom.hardwareIds)||[],hash:(v.hashes&&v.hashes.sha256)||'',length:v.length||0}));
-  renderTargets();
-}
-function renderTargets(){
-  document.getElementById('nav-tgt').textContent=TARGETS.length;
-  document.getElementById('tgt-count').textContent=TARGETS.length; document.getElementById('t-tgt').textContent=TARGETS.length;
-  document.getElementById('tgtWrap').innerHTML=TARGETS.length?`<table><thead><tr><th>Name</th><th>Version</th><th>Hardware</th><th>SHA256</th></tr></thead><tbody>${TARGETS.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td class="mono">${esc(t.version)}</td><td><span class="tag">${esc(t.hw.join(', '))}</span></td><td class="mono muted">${esc(shortHash(t.hash))}…</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No versions uploaded yet.</div>';
-}
-async function uploadVersion(){
-  const name=document.getElementById('upName').value.trim(),ver=document.getElementById('upVer').value.trim(),hw=document.getElementById('upHw').value.trim(),file=document.getElementById('upFile').files[0];
-  const msg=document.getElementById('upMsg'),btn=document.getElementById('upBtn');
+async function loadTargets(){let signed;try{const r=await api(rapi('targets.json'));signed=r.signed||r;}catch(e){TARGETS=[];renderTargets();return;}
+  const t=signed.targets||{};TARGETS=Object.entries(t).map(([k,v])=>({key:k,name:(v.custom&&v.custom.name)||k,version:(v.custom&&v.custom.version)||'',hw:(v.custom&&v.custom.hardwareIds)||[],hash:(v.hashes&&v.hashes.sha256)||'',length:v.length||0}));renderTargets();}
+function renderTargets(){document.getElementById('nav-tgt').textContent=TARGETS.length;document.getElementById('tgt-count').textContent=TARGETS.length;document.getElementById('t-tgt').textContent=TARGETS.length;
+  document.getElementById('tgtWrap').innerHTML=TARGETS.length?`<table><thead><tr><th>Name</th><th>Version</th><th>Hardware</th><th>SHA256</th></tr></thead><tbody>${TARGETS.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td class="mono">${esc(t.version)}</td><td><span class="tag">${esc(t.hw.join(', '))}</span></td><td class="mono muted">${esc(shortHash(t.hash))}…</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No versions uploaded yet.</div>';}
+async function uploadVersion(){const name=document.getElementById('upName').value.trim(),ver=document.getElementById('upVer').value.trim(),hw=document.getElementById('upHw').value.trim(),file=document.getElementById('upFile').files[0];const msg=document.getElementById('upMsg'),btn=document.getElementById('upBtn');
   if(!name||!ver||!hw||!file)return showMsg(msg,'err','Fill name, version, hardware id and pick a file.');
-  const target=`${name}-${ver}`,q=`name=${encodeURIComponent(name)}&version=${encodeURIComponent(ver)}&hardwareIds=${encodeURIComponent(hw)}`;
-  const fd=new FormData();fd.append('file',file);
+  const target=`${name}-${ver}`,q=`name=${encodeURIComponent(name)}&version=${encodeURIComponent(ver)}&hardwareIds=${encodeURIComponent(hw)}`;const fd=new FormData();fd.append('file',file);
   btn.disabled=true;showMsg(msg,'ok','Uploading '+file.name+'…');
-  try{await api(rapi(`targets/${encodeURIComponent(target)}?${q}`),{method:'PUT',body:fd});showMsg(msg,'ok','✓ Uploaded '+target+'.');document.getElementById('upFile').value='';await loadTargets();}
-  catch(e){showMsg(msg,'err','Upload failed: '+e.message);}finally{btn.disabled=false;}
-}
+  try{await api(rapi(`targets/${encodeURIComponent(target)}?${q}`),{method:'PUT',body:fd});showMsg(msg,'ok','✓ Uploaded '+target+'.');document.getElementById('upFile').value='';await loadTargets();}catch(e){showMsg(msg,'err','Upload failed: '+e.message);}finally{btn.disabled=false;}}
 
 // ---------- sources ----------
-async function loadSources(){
-  let roles=[];try{roles=await api(rapi('trusted-delegations'))||[];}catch(e){roles=[];}
+async function loadSources(){let roles=[];try{roles=await api(rapi('trusted-delegations'))||[];}catch(e){roles=[];}
   let counts={};try{const di=await api(rapi('delegations_items'));(di.values||di||[]).forEach(it=>{counts[it.delegatedRoleName]=(counts[it.delegatedRoleName]||0)+1;});}catch(e){}
   const infos=await Promise.all(roles.map(r=>api(rapi('trusted-delegations/'+encodeURIComponent(r.name)+'/info')).catch(()=>({}))));
-  SOURCES=roles;
   document.getElementById('nav-src').textContent=roles.length;document.getElementById('src-count').textContent=roles.length;document.getElementById('t-src').textContent=roles.length;
   const tot=Object.values(counts).reduce((a,b)=>a+b,0);document.getElementById('t-src-m').textContent=tot+' packages available';
   document.getElementById('srcWrap').innerHTML=roles.length?roles.map((r,i)=>{const info=infos[i]||{},n=counts[r.name]||0;
-    return `<div class="srcrow"><span class="pill acc"><span class="d"></span>verified</span>
-      <div class="grow"><div class="nm">${esc(info.friendlyName||r.name)}</div><div class="muted mono" style="font-size:12px">${esc(r.name)} · paths ${esc((r.paths||[]).join(', '))} · ${info.lastFetched?('fetched '+fmtTime(info.lastFetched)):'not fetched'}</div></div>
-      <span class="tag">${n} packages</span>
-      <button class="btn sm" onclick="refreshSource('${esc(r.name)}')">Refresh</button>
-      <button class="btn sm danger" onclick="removeSource('${esc(r.name)}')">Remove</button></div>`;}).join(''):'<div class="empty">No external package sources yet.</div>';
-}
-async function addSource(){
-  const msg=document.getElementById('srcMsg'),btn=document.getElementById('srcBtn');
-  let cfg;try{cfg=JSON.parse(document.getElementById('srcJson').value);}catch(e){return showMsg(msg,'err','Invalid JSON.');}
-  const dm=cfg.delegationMetadata,keys=cfg.keys,fu=cfg.fetchUrl;
-  if(!dm||!keys||!fu||!dm.name)return showMsg(msg,'err','JSON needs keys, delegationMetadata (with name), and fetchUrl.');
-  btn.disabled=true;showMsg(msg,'ok','Registering + verifying source…');const H={'Content-Type':'application/json'};
-  try{await api(rapi('trusted-delegations/keys'),{method:'PUT',headers:H,body:JSON.stringify(keys)});
-    await api(rapi('trusted-delegations'),{method:'PUT',headers:H,body:JSON.stringify([dm])});
-    await api(rapi('trusted-delegations/'+encodeURIComponent(dm.name)+'/remote'),{method:'PUT',headers:H,body:JSON.stringify({uri:fu.uri,friendlyName:cfg.friendlyName||dm.name})});
-    showMsg(msg,'ok','✓ Source "'+dm.name+'" added and verified.');document.getElementById('srcJson').value='';await loadSources();}
-  catch(e){showMsg(msg,'err','Failed: '+e.message);}finally{btn.disabled=false;}
-}
+    return `<div class="srcrow"><span class="pill acc"><span class="d"></span>verified</span><div class="grow"><div class="nm">${esc(info.friendlyName||r.name)}</div><div class="muted mono" style="font-size:12px">${esc(r.name)} · paths ${esc((r.paths||[]).join(', '))} · ${info.lastFetched?('fetched '+relTime(info.lastFetched)):'not fetched'}</div></div><span class="tag">${n} packages</span><button class="btn sm" onclick="refreshSource('${esc(r.name)}')">Refresh</button><button class="btn sm danger" onclick="removeSource('${esc(r.name)}')">Remove</button></div>`;}).join(''):'<div class="empty">No external package sources yet.</div>';}
+async function addSource(){const msg=document.getElementById('srcMsg'),btn=document.getElementById('srcBtn');let cfg;try{cfg=JSON.parse(document.getElementById('srcJson').value);}catch(e){return showMsg(msg,'err','Invalid JSON.');}
+  const dm=cfg.delegationMetadata,keys=cfg.keys,fu=cfg.fetchUrl;if(!dm||!keys||!fu||!dm.name)return showMsg(msg,'err','JSON needs keys, delegationMetadata (with name), and fetchUrl.');
+  btn.disabled=true;showMsg(msg,'ok','Registering + verifying…');const HH={'Content-Type':'application/json'};
+  try{await api(rapi('trusted-delegations/keys'),{method:'PUT',headers:HH,body:JSON.stringify(keys)});await api(rapi('trusted-delegations'),{method:'PUT',headers:HH,body:JSON.stringify([dm])});await api(rapi('trusted-delegations/'+encodeURIComponent(dm.name)+'/remote'),{method:'PUT',headers:HH,body:JSON.stringify({uri:fu.uri,friendlyName:cfg.friendlyName||dm.name})});
+    showMsg(msg,'ok','✓ Source "'+dm.name+'" added and verified.');document.getElementById('srcJson').value='';await loadSources();}catch(e){showMsg(msg,'err','Failed: '+e.message);}finally{btn.disabled=false;}}
 async function refreshSource(n){try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)+'/remote/refresh'),{method:'PUT'});toast('Refreshed');await loadSources();}catch(e){toast('Refresh failed: '+e.message);}}
 async function removeSource(n){if(!confirm('Remove package source "'+n+'"?'))return;try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)),{method:'DELETE'});toast('Removed');await loadSources();}catch(e){toast('Remove failed: '+e.message);}}
-function fillPkgDevice(){document.getElementById('pkgDevice').innerHTML=DEVICES.map(d=>`<option value="${esc(d.uuid)}">${esc(d.deviceName||d.deviceId)}</option>`).join('')||'<option value="">no devices</option>';}
-let pkgTimer;
-function browsePackages(){clearTimeout(pkgTimer);pkgTimer=setTimeout(async()=>{
-  const q=document.getElementById('pkgSearch').value.trim(),w=document.getElementById('pkgWrap');
-  try{const di=await api(rapi('delegations_items'+(q?('?nameContains='+encodeURIComponent(q)):'')));const items=(di.values||di||[]);
-    document.getElementById('pkg-count').textContent=items.length;
+function fillPkgDevice(){const el=document.getElementById('pkgDevice');if(el)el.innerHTML=DEVICES.map(d=>`<option value="${esc(d.uuid)}">${esc(d.deviceName||d.deviceId)}</option>`).join('')||'<option value="">no devices</option>';}
+let pkgTimer;function browsePackages(){clearTimeout(pkgTimer);pkgTimer=setTimeout(async()=>{const q=document.getElementById('pkgSearch').value.trim(),w=document.getElementById('pkgWrap');
+  try{const di=await api(rapi('delegations_items'+(q?('?nameContains='+encodeURIComponent(q)):'')));const items=(di.values||di||[]);document.getElementById('pkg-count').textContent=items.length;
     if(!items.length){w.innerHTML='<div class="empty">No matching packages.</div>';return;}
-    PKGS=items.slice(0,25).map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{};
-      return {filename:it.targetFilename,hash:h.sha256,uri:c.uri,hw:(c.hardwareIds||[]),format:c.targetFormat||'',len:(it.clientTargetItem&&it.clientTargetItem.length)||0};});
+    PKGS=items.slice(0,25).map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{};return {filename:it.targetFilename,hash:h.sha256,uri:c.uri,hw:(c.hardwareIds||[]),format:c.targetFormat||'',len:(it.clientTargetItem&&it.clientTargetItem.length)||0};});
     w.innerHTML=`<div class="msg" id="pkgMsg"></div><div class="tablewrap"><table><thead><tr><th>Package</th><th>Hardware</th><th>Format</th><th class="right">Deploy</th></tr></thead><tbody>${PKGS.map((p,i)=>`<tr><td class="mono" style="max-width:430px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.filename)}">${esc(p.filename)}</td><td><span class="tag">${esc(p.hw.join(','))}</span></td><td><span class="pill acc"><span class="d"></span>${esc(p.format)}</span></td><td class="right"><button class="btn sm primary" onclick="deployDelegated(${i})">Deploy →</button></td></tr>`).join('')}</tbody></table></div>${items.length>25?'<div class="muted" style="padding:8px 4px;font-size:12px">Showing first 25 of '+items.length+' — refine the filter.</div>':''}`;
-  }catch(e){w.innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>';}
-},300);}
-async function deployDelegated(i){
-  const p=PKGS[i],uuid=document.getElementById('pkgDevice').value,msg=document.getElementById('pkgMsg');
-  if(!uuid)return showMsg(msg,'err','No device selected.');
-  if(!p.hash||!p.uri)return showMsg(msg,'err','Package missing hash/uri.');
-  const hw=p.hw[0];if(!hw)return showMsg(msg,'err','Package has no hardware id.');
+  }catch(e){w.innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>';}},300);}
+async function deployDelegated(i){const p=PKGS[i],uuid=document.getElementById('pkgDevice').value,msg=document.getElementById('pkgMsg');
+  if(!uuid)return showMsg(msg,'err','No device selected.');if(!p.hash||!p.uri)return showMsg(msg,'err','Package missing hash/uri.');const hw=p.hw[0];if(!hw)return showMsg(msg,'err','Package has no hardware id.');
   showMsg(msg,'ok','Assigning '+p.filename.split('/').pop()+'…');
   try{const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targets:{[hw]:{to:{target:p.filename,checksum:{method:'sha256',hash:p.hash},targetLength:p.len||0,uri:p.uri}}}})})).replace(/"/g,'');
     const res=await api('/api/director/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correlationId:'urn:here-ota:mtu:'+mtu,mtuId:mtu,devices:[uuid]})});
-    showMsg(msg,res&&res.affected&&res.affected.length?'ok':'err',res&&res.affected&&res.affected.length?'✓ Assigned — device pulls from the source on next check-in.':'Device not affected (hw mismatch or already installed).');
-    setTimeout(refreshAll,900);
-  }catch(e){showMsg(msg,'err','Failed: '+e.message);}
-}
+    showMsg(msg,res&&res.affected&&res.affected.length?'ok':'err',res&&res.affected&&res.affected.length?'✓ Assigned — device pulls from the source on next check-in.':'Device not affected (hw mismatch or already installed).');setTimeout(refreshAll,900);
+  }catch(e){showMsg(msg,'err','Failed: '+e.message);}}
 
 // ---------- provisioning ----------
 function openProvision(){document.getElementById('provModal').classList.add('open');renderProvCmd();}
 function closeProvision(){document.getElementById('provModal').classList.remove('open');}
-function renderProvCmd(){const name=(document.getElementById('provName').value||'').trim().replace(/[^A-Za-z0-9_-]/g,'');const tok=(document.getElementById('provToken').value||'').trim();
-  const o=location.origin,n=name?(' -n '+name):'',t=tok?(' -t '+tok):'';
-  document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}${t}`;}
+function renderProvCmd(){const name=(document.getElementById('provName').value||'').trim().replace(/[^A-Za-z0-9_-]/g,'');const tok=(document.getElementById('provToken').value||'').trim();const o=location.origin,n=name?(' -n '+name):'',t=tok?(' -t '+tok):'';document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}${t}`;}
 function copyProvCmd(){const t=document.getElementById('provCmd');navigator.clipboard.writeText(t.value).then(()=>showMsg(document.getElementById('provMsg'),'ok','Copied — paste into a root shell on the device.')).catch(()=>{t.select();document.execCommand('copy');});}
 
 // ---------- boot ----------
 async function refreshAll(){try{await Promise.all([loadDevices(),loadTargets(),loadSources()]);setStatus(true);}catch(e){setStatus(false);}}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();closeProvision();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProvision();});
 refreshAll();
-setInterval(loadDevices,7000);
+setInterval(()=>{if(document.getElementById('v-device').classList.contains('active'))return;loadDevices();},8000);
 </script>
