@@ -24,8 +24,10 @@ if [ -r /etc/os-release ]; then . /etc/os-release; os_name=${NAME:-}; os_version
 # the fallback onto the real output, yielding two JSON values. Capture, then default if empty.
 usb=$(lsusb 2>/dev/null | jq -R . | jq -s . 2>/dev/null); [ -n "$usb" ] || usb='[]'
 block=$(lsblk -J -o NAME,SIZE,TYPE,FSTYPE,MODEL,TRAN,MOUNTPOINTS 2>/dev/null); [ -n "$block" ] || block='{"blockdevices":[]}'
-# interfaces as objects {name,state,mac,ipv4} — ip -j gives structured output on modern iproute2
-nics=$(ip -j addr show 2>/dev/null | jq -c '[.[] | {name:.ifname, state:.operstate, mac:(.address//null), ipv4:([.addr_info[]?|select(.family=="inet")|.local]|first//null)}]' 2>/dev/null); [ -n "$nics" ] || nics='[]'
+# interfaces as objects {name,state,mac,ipv4} — ip -j gives structured output on modern iproute2.
+# Skip virtual/ephemeral interfaces (docker veth/bridges, lo, tun/tap, uap, sit) — otherwise the
+# report churns every time a container starts/stops and would trigger needless republishes.
+nics=$(ip -j addr show 2>/dev/null | jq -c '[.[] | select((.ifname|test("^(lo|sit|docker|veth|br-|virbr|tap|tun|uap)"))|not) | {name:.ifname, state:.operstate, mac:(.address//null), ipv4:([.addr_info[]?|select(.family=="inet")|.local]|first//null)}]' 2>/dev/null); [ -n "$nics" ] || nics='[]'
 # eMMC wear/health from sysfs (JEDEC eMMC 5.0: pre_eol_info + device life-time estimates).
 # Only the whole-device nodes (mmcblkN) expose it — skip partitions / boot / rpmb. Raw hex
 # values; the console decodes them. Empty on non-eMMC boards (e.g. virtio on QEMU).
@@ -59,7 +61,12 @@ printf '%s' "$lshw_json" | jq \
       storage_health:$storage_health
   }}' >"$TMP" || { echo "ota-hwinfo: jq assembly failed" >&2; exit 1; }
 
-# --- publish only when the meaningful report changed (avoids needless aktualizr restarts) ---
+# --- keep the file current; NEVER restart aktualizr ---
+# aktualizr reads --hwinfo-file only at startup, so it publishes this on its next natural start
+# (a reboot — which every OS update does anyway). We deliberately do NOT restart aktualizr here:
+# a restart mid-update kills it after the OSTree deploy but before it records the install, leaving
+# the device in an inconsistent "storage vs OSTree mismatch" state. Freshness of system_info is
+# not worth risking the update flow.
 new=$(jq -cS '.ota_report' "$TMP" 2>/dev/null)
 old=$(jq -cS '.ota_report' "$OUT" 2>/dev/null || echo "none")
 if [ "$new" = "$old" ]; then
@@ -67,5 +74,4 @@ if [ "$new" = "$old" ]; then
   exit 0
 fi
 install -m600 "$TMP" "$OUT"
-echo "ota-hwinfo: report changed — updated $OUT, restarting aktualizr"
-systemctl restart aktualizr || true
+echo "ota-hwinfo: report changed — updated $OUT (aktualizr will publish it on its next start; not restarting)"

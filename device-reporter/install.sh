@@ -14,5 +14,14 @@ install -D -m644 "$D/aktualizr-hwinfo.conf" /etc/systemd/system/aktualizr-torizo
 systemctl daemon-reload
 udevadm control --reload
 systemctl enable --now ota-hwinfo.timer
-/var/lib/ota-hwinfo/ota-hwinfo.sh   # initial report (writes the file + restarts aktualizr)
-echo "ota-hwinfo installed and enabled."
+/var/lib/ota-hwinfo/ota-hwinfo.sh   # writes /var/sota/hwinfo.json (never restarts aktualizr)
+
+# One controlled restart so the enriched system_info publishes now — but ONLY if no OSTree update
+# is pending, so we never interrupt an in-progress update. After this, the reporter never restarts
+# aktualizr again; new data publishes on the next reboot.
+if ostree admin status 2>/dev/null | grep -q '(pending)'; then
+  echo "ota-hwinfo installed — an OSTree update is pending, so NOT restarting aktualizr; enriched system_info will publish after the next reboot."
+else
+  systemctl restart aktualizr-torizon 2>/dev/null || systemctl restart aktualizr 2>/dev/null || true
+  echo "ota-hwinfo installed and enabled (published initial system_info)."
+fi
