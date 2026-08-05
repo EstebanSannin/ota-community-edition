@@ -298,6 +298,7 @@ async function loadDevices(){
 function primaryOf(uuid){return (INSTALLED[uuid]||[]).find(e=>e.primary)||(INSTALLED[uuid]||[])[0]||null;}
 function verOf(uuid){const p=primaryOf(uuid);const f=p&&p.image&&p.image.filepath;return (f&&f!=='unknown')?f.split('/').pop():null;}
 function hwOf(uuid){const p=primaryOf(uuid);return p?p.hardwareId:'';}
+function hwSet(uuid){return (INSTALLED[uuid]||[]).map(e=>e.hardwareId).filter(Boolean);}  // all ECUs (primary + secondaries)
 const avatar='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
 function renderDevices(){
   document.getElementById('nav-dev').textContent=DEVICES.length; document.getElementById('dev-count').textContent=DEVICES.length;
@@ -803,7 +804,9 @@ async function pkgDeploy(){const p=PKGCUR;if(!p)return;
   const hw=(p.hw||[])[0];if(!hw)return toast('Package has no hardware id.');
   const target=p.source==='mine'?p.key:p.filename;
   if(!p.hash)return toast('Package is missing its checksum.');
-  const opts=DEVICES.map(d=>{const dhw=hwOf(d.uuid);const compat=!dhw||dhw===hw;return {label:(d.deviceName||d.deviceId),sub:(dhw||'unknown hw')+(compat?' · compatible':' · hardware mismatch'),uuid:d.uuid};});
+  const opts=DEVICES.map(d=>{const set=hwSet(d.uuid);const compat=!set.length||set.includes(hw);
+    return {label:(d.deviceName||d.deviceId),sub:(compat?'has a '+hw+' ECU · compatible':(hwOf(d.uuid)||'unknown hw')+' · no '+hw+' ECU'),uuid:d.uuid,compat:compat};});
+  opts.sort((a,b)=>(b.compat?1:0)-(a.compat?1:0));
   if(!opts.length)return toast('No devices provisioned.');
   const idx=await uiPick({title:'Deploy “'+p.name+' '+(p.version||'')+'” to…',options:opts});
   if(idx==null)return;const uuid=opts[idx].uuid;
