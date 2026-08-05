@@ -95,6 +95,20 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
 .modal .m .btn.dbad{background:var(--bad);border-color:var(--bad);color:#fff}
 .modal .m .picklist{padding:14px 14px 6px;max-height:56vh;overflow:auto}
 .pickrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:11px 13px;border:1px solid var(--border);border-radius:9px;background:var(--surface);cursor:pointer;margin-bottom:9px;font-family:inherit} .pickrow:hover{border-color:var(--accent);background:var(--accent-weak)} .pickrow .pk-t{font-weight:620;font-size:14px;color:var(--text)} .pickrow .pk-s{font-size:12px;color:var(--text-dim);font-family:var(--mono)}
+/* device-list toolbar / multi-select / danger zone */
+.btn.dbad{background:var(--bad);border-color:var(--bad);color:#fff} .btn.dbad:hover{filter:brightness(1.06);border-color:var(--bad)}
+.dtoolbar{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.dtoolbar .search{position:relative;flex:1;max-width:340px;min-width:200px}
+.dtoolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-faint)}
+.dtoolbar .search input{width:100%;padding:8px 11px 8px 33px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:13.5px;font-family:inherit} .dtoolbar .search input:focus{outline:none;border-color:var(--accent)}
+.dtags{display:flex;gap:7px;flex-wrap:wrap}
+.tchip{padding:6px 11px;border:1px solid var(--border);border-radius:20px;background:var(--surface-2);color:var(--text-dim);font-size:12.5px;cursor:pointer;font-family:inherit} .tchip:hover{border-color:var(--accent)} .tchip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-weak);font-weight:600}
+.dbulk{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--accent-weak);font-size:13.5px} .dbulk b{color:var(--accent)} .dbulk .grow{flex:1}
+th.ck,td.ck{width:34px;text-align:center;padding-left:14px;padding-right:0}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;vertical-align:middle;margin:0}
+tbody tr.sel{background:var(--accent-weak)}
+.card.dz{border-color:color-mix(in srgb,var(--bad) 35%,var(--border))}
+.dzrow{display:flex;align-items:center;gap:14px;padding:16px 18px} .dzrow .g{flex:1} .dzrow .t{font-weight:640} .dzrow .s{color:var(--text-dim);font-size:13px}
 .cmd{font-family:var(--mono);font-size:12.5px;background:#0a1119;color:#d6e2f0;border-color:#1d2a3a;white-space:pre-wrap;word-break:break-all}
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-weight:600;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:60} .toast.show{opacity:1;transform:translate(-50%,0)}
 /* ---- device detail ---- */
@@ -173,7 +187,12 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
       </section>
 
       <section class="view" id="v-devices">
-        <div class="card"><header><h2>Devices</h2><span class="count" id="dev-count">0</span></header>
+        <div class="card"><header><h2>Devices</h2><span class="count" id="dev-count">0</span><span class="grow"></span></header>
+          <div class="dtoolbar" id="devToolbar">
+            <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="devSearch" placeholder="Search by name or UUID…" oninput="renderDeviceList()"></div>
+            <div class="dtags" id="devTags"></div>
+          </div>
+          <div class="dbulk" id="devBulk" style="display:none"></div>
           <div class="tablewrap" id="devWrap"><div class="empty">Loading…</div></div></div>
       </section>
 
@@ -246,6 +265,7 @@ function showMsg(el,cls,txt){if(el){el.className='msg show '+cls;el.textContent=
 function setStatus(up){document.getElementById('dot').className='dot '+(up?'up':'down');document.getElementById('status').textContent=up?('connected · '+location.host):'backend unreachable';}
 function pillClass(s){return s==='UpToDate'?'ok':(s==='Outdated'||s==='UpdatePending'||s==='UpdateScheduled')?'warn':(s==='Error')?'bad':'idle';}
 let DEVICES=[], INSTALLED={}, TARGETS=[], PKGS=[];
+let SEL=new Set(), FTAGS=new Set();   // selected device uuids + active tag filters
 
 const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Software versions you host on this cloud'],sources:['Package Sources','External TUF delegations you trust']};
 function go(v){document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
@@ -267,13 +287,7 @@ function hwOf(uuid){const p=primaryOf(uuid);return p?p.hardwareId:'';}
 const avatar='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
 function renderDevices(){
   document.getElementById('nav-dev').textContent=DEVICES.length; document.getElementById('dev-count').textContent=DEVICES.length;
-  const row=d=>`<tr class="click" onclick="openDevice('${esc(d.uuid)}')">
-      <td><div class="dev"><span class="av">${avatar}</span><div class="nm">${esc(d.deviceName||d.deviceId)}</div></div></td>
-      <td><span class="pill ${pillClass(d.deviceStatus)}"><span class="d"></span>${esc(d.deviceStatus||'—')}</span></td>
-      <td>${hwOf(d.uuid)?`<span class="tag">${esc(hwOf(d.uuid))}</span>`:'<span class="muted">—</span>'}</td>
-      <td class="mono">${verOf(d.uuid)?esc(verOf(d.uuid)):'<span class="muted">—</span>'}</td>
-      <td class="muted">${relTime(d.lastSeen)}</td></tr>`;
-  document.getElementById('devWrap').innerHTML=DEVICES.length?`<table><thead><tr><th>Device</th><th>Status</th><th>Hardware</th><th>Installed version</th><th>Last seen</th></tr></thead><tbody>${DEVICES.map(row).join('')}</tbody></table>`:'<div class="empty">No devices provisioned yet. Click “Provision device”.</div>';
+  renderDeviceList();
   const prev=DEVICES.slice(0,6).map(d=>`<tr class="click" onclick="openDevice('${esc(d.uuid)}')"><td><div class="dev"><span class="av">${avatar}</span><div class="nm">${esc(d.deviceName||d.deviceId)}</div></div></td><td><span class="pill ${pillClass(d.deviceStatus)}"><span class="d"></span>${esc(d.deviceStatus||'—')}</span></td><td class="mono">${verOf(d.uuid)?esc(verOf(d.uuid)):'<span class="muted">—</span>'}</td></tr>`).join('');
   document.getElementById('dash-devs').innerHTML=DEVICES.length?`<table><thead><tr><th>Device</th><th>Status</th><th>Version</th></tr></thead><tbody>${prev}</tbody></table>`:'<div class="empty">No devices yet.</div>';
   const by={}; DEVICES.forEach(d=>{const c=pillClass(d.deviceStatus);by[c]=(by[c]||0)+1;});
@@ -289,6 +303,55 @@ function renderDevices(){
       <div class="row"><span class="sw" style="background:var(--idle)"></span> Not seen <span class="n num">${by.idle||0}</span></div></div>`;
   fillPkgDevice();
 }
+const trashSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13h10l1-13"/></svg>';
+function allTags(){const s=new Set();DEVICES.forEach(d=>Object.keys(d.attributes||{}).forEach(t=>s.add(t)));return[...s].sort();}
+function filteredDevices(){
+  const q=(document.getElementById('devSearch')?.value||'').toLowerCase().trim();
+  return DEVICES.filter(d=>{
+    if(q){const hay=((d.deviceName||'')+' '+(d.deviceId||'')+' '+(d.uuid||'')).toLowerCase();if(!hay.includes(q))return false;}
+    if(FTAGS.size){const dt=Object.keys(d.attributes||{});let hit=false;FTAGS.forEach(t=>{if(dt.includes(t))hit=true;});if(!hit)return false;}
+    return true;});
+}
+function renderDeviceList(){
+  const tb=document.getElementById('devToolbar');if(tb)tb.style.display=DEVICES.length?'':'none';
+  const tags=allTags();const tc=document.getElementById('devTags');
+  if(tc)tc.innerHTML=tags.map(t=>`<button class="tchip ${FTAGS.has(t)?'on':''}" onclick="toggleTagFilter('${esc(t)}')">${esc(t)}${FTAGS.has(t)?' ✕':''}</button>`).join('');
+  const list=filteredDevices();
+  const bulk=document.getElementById('devBulk');
+  if(bulk){if(SEL.size){bulk.style.display='';bulk.innerHTML=`<span><b>${SEL.size}</b> selected</span><span class="grow"></span><button class="btn sm dbad" onclick="bulkDelete()">${trashSvg} Delete selected</button><button class="btn sm ghost" onclick="clearSel()">Clear</button>`;}else bulk.style.display='none';}
+  const allOn=list.length>0&&list.every(d=>SEL.has(d.uuid));
+  const row=d=>{const sel=SEL.has(d.uuid);return `<tr class="click${sel?' sel':''}" onclick="openDevice('${esc(d.uuid)}')">
+      <td class="ck" onclick="event.stopPropagation()"><input type="checkbox" ${sel?'checked':''} onchange="toggleSel('${esc(d.uuid)}',this.checked)"></td>
+      <td><div class="dev"><span class="av">${avatar}</span><div class="nm">${esc(d.deviceName||d.deviceId)}</div></div></td>
+      <td><span class="pill ${pillClass(d.deviceStatus)}"><span class="d"></span>${esc(d.deviceStatus||'—')}</span></td>
+      <td>${hwOf(d.uuid)?`<span class="tag">${esc(hwOf(d.uuid))}</span>`:'<span class="muted">—</span>'}</td>
+      <td class="mono">${verOf(d.uuid)?esc(verOf(d.uuid)):'<span class="muted">—</span>'}</td>
+      <td class="muted">${relTime(d.lastSeen)}</td></tr>`;};
+  const el=document.getElementById('devWrap');if(!el)return;
+  el.innerHTML=!DEVICES.length?'<div class="empty">No devices provisioned yet. Click “Provision device”.</div>'
+    :!list.length?'<div class="empty">No devices match your search or filter.</div>'
+    :`<table><thead><tr><th class="ck"><input type="checkbox" ${allOn?'checked':''} onclick="toggleSelectAll(this.checked)"></th><th>Device</th><th>Status</th><th>Hardware</th><th>Installed version</th><th>Last seen</th></tr></thead><tbody>${list.map(row).join('')}</tbody></table>`;
+}
+function toggleSel(u,on){on?SEL.add(u):SEL.delete(u);renderDeviceList();}
+function toggleSelectAll(on){filteredDevices().forEach(d=>on?SEL.add(d.uuid):SEL.delete(d.uuid));renderDeviceList();}
+function clearSel(){SEL.clear();renderDeviceList();}
+function toggleTagFilter(t){FTAGS.has(t)?FTAGS.delete(t):FTAGS.add(t);renderDeviceList();}
+async function bulkDelete(){return confirmDelete([...SEL]);}
+async function confirmDelete(uuids){
+  uuids=uuids.filter(u=>DEVICES.some(d=>d.uuid===u));if(!uuids.length)return;
+  const names=uuids.map(u=>{const d=DEVICES.find(x=>x.uuid===u)||{};return d.deviceName||d.deviceId||u;});
+  const n=uuids.length,shown=names.slice(0,3).join(', ')+(n>3?` +${n-3} more`:'');
+  const ok=await uiConfirm({title:n===1?'Delete device?':'Delete '+n+' devices?',
+    message:'This permanently removes '+shown+' from this cloud — events, system info, tags and ECU records are deleted. This cannot be undone.',
+    ok:n===1?'Delete device':'Delete '+n+' devices',danger:true});
+  if(!ok)return;
+  let done=0,fail=0;
+  for(const u of uuids){try{await api(dapi('devices/'+u),{method:'DELETE'});done++;}catch(e){fail++;}}
+  SEL.clear();
+  await loadDevices();
+  toast(fail?done+' deleted, '+fail+' failed':(n===1?'Device deleted':done+' devices deleted'));
+}
+async function deleteCurrentDevice(){const u=CUR&&CUR.uuid;if(!u)return;await confirmDelete([u]);if(!DEVICES.some(d=>d.uuid===u))go('devices');}
 
 // ---------- device detail ----------
 let CUR=null;           // {uuid, device, ecus, sysinfo, packages, events}
@@ -432,7 +495,11 @@ function renderDetail(){
       <div class="discbody"><input id="dd-pkgfilter" placeholder="filter packages…" oninput="renderPkgs()"><table class="pkgtbl" id="dd-pkgtbl"></table></div></details>
 
     <div class="card"><header>${H('<path d="M3 3v6h6"/><path d="M3 9a9 9 0 1 0 3-6"/><path d="M12 8v4l3 2"/>')}<h2>Update history</h2><span class="count">${evs.length}</span></header>
-      <div class="pad">${evs.length?`<div class="tl">${evs.map(e=>`<div class="ev ${evClass((e.eventType&&e.eventType.id)||'')}"><div class="t">${esc((e.eventType&&e.eventType.id)||'event')}</div><div class="d">${fmtTime(e.deviceTime)}</div></div>`).join('')}</div>`:'<div class="empty">No events yet.</div>'}</div></div>`;
+      <div class="pad">${evs.length?`<div class="tl">${evs.map(e=>`<div class="ev ${evClass((e.eventType&&e.eventType.id)||'')}"><div class="t">${esc((e.eventType&&e.eventType.id)||'event')}</div><div class="d">${fmtTime(e.deviceTime)}</div></div>`).join('')}</div>`:'<div class="empty">No events yet.</div>'}</div></div>
+
+    <div class="card dz"><header>${H('<path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>')}<h2>Danger zone</h2></header>
+      <div class="dzrow"><div class="g"><div class="t">Delete this device</div><div class="s">Removes <b>${esc(d.deviceName||d.deviceId||uuid)}</b> and all its data from this cloud. Cannot be undone.</div></div>
+      <button class="btn dbad" onclick="deleteCurrentDevice()">${trashSvg} Delete device</button></div></div>`;
   renderPkgs();
 }
 function netIcon(kind){return kind==='Wi-Fi'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01"/></svg>':kind==='CAN bus'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 12h4l2-3 4 6 2-3h4"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M6 9V6M18 9V6"/></svg>';}
