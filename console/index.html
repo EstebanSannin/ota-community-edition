@@ -397,7 +397,6 @@ function renderDetail(){
   const serial=(sys.serial) || ((nodes.find(n=>n.class==='system')||{}).serial) || (d.deviceId||'').split('-').pop();
   const pri=primaryOf(uuid)||{};
   const osname=o.os_name||'Torizon OS'; const osver=o.os_version||verOf(uuid)||'';
-  const tags=Object.keys((d.attributes)||{});
   const blk=flatBlk(o.block_devices,[]);
   // eMMC: the mmc-transport node that actually carries mounts (the partition, not the bare disk)
   const emmc=blk.filter(b=>b.tran==='mmc'&&mnts(b).length).sort((a,b)=>mnts(b).length-mnts(a).length)[0]
@@ -437,7 +436,7 @@ function renderDetail(){
           <span><b>Last seen</b> ${relTime(d.lastSeen)}</span>
           <span><b>UUID</b> <span class="mono">${esc(uuid.slice(0,8))}…</span></span>
         </div>
-        <div class="tags" id="dd-tags">${tags.map(t=>`<span class="chip">${esc(t)} <span class="x" onclick="removeTag('${esc(t)}')">×</span></span>`).join('')}<span class="chip add" onclick="addTag()">+ Add tag</span></div>
+        <div class="tags" id="dd-tags">${Object.entries(d.attributes||{}).map(([k,v])=>`<span class="chip">${esc(k)}${v&&v!=='true'?': '+esc(v):''} <span class="x" onclick="removeTag('${esc(k)}')">×</span></span>`).join('')}<span class="chip add" onclick="addTag()">+ Add tag</span></div>
       </div>
       <div class="dactions">
         <button class="btn primary" onclick="deployPrompt('${esc(hwOf(uuid))}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Deploy update</button>
@@ -553,11 +552,19 @@ function uiPick(o){o=o||{};return new Promise(resolve=>{
 
 async function renameDevice(){const n=await uiPrompt({title:'Rename device',label:'Device name',value:CUR.device.deviceName||'',placeholder:'my-device-01'});if(n==null)return;const v=n.trim();if(!v||v===CUR.device.deviceName)return;patchDevice({deviceName:v},'Renamed');}
 async function editNotes(){const n=await uiPrompt({title:'Edit description',label:'Description',value:CUR.device.notes||'',placeholder:'What is this device for?',multiline:true,ok:'Save'});if(n==null)return;patchDevice({notes:n.trim()},'Description saved');}
-async function addTag(){const t=((await uiPrompt({title:'Add tag',label:'Tag (keyword)',placeholder:'e.g. production'}))||'').trim();if(!t)return;
-  try{await api(dapi('devices/'+CUR.uuid+'/device_tags'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({tagId:t,tagValue:'true'})});
-    CUR.device.attributes=Object.assign({},CUR.device.attributes,{[t]:'true'});renderDetail();toast('Tag added');}
-  catch(e){toast('Tags need a tag definition first — noted, wiring later. ('+e.message.slice(0,40)+')');}}
-function removeTag(t){toast('Tag removal wiring coming soon');}
+async function addTag(){
+  const raw=((await uiPrompt({title:'Add tag',label:'Tag — "key" or "key=value"',placeholder:'e.g. env=lab or production'}))||'').trim();
+  if(!raw)return;
+  const eq=raw.indexOf('=');const key=(eq>=0?raw.slice(0,eq):raw).trim();const val=(eq>=0?raw.slice(eq+1):'true').trim()||'true';
+  if(!/^[\w\-]{1,20}$/.test(key))return toast('Tag key must be ≤20 chars: letters, digits, - or _ (no spaces)');
+  try{await api(dapi('devices/'+CUR.uuid+'/device_tags'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({tagId:key,tagValue:val})});
+    await loadDevices();CUR.device=DEVICES.find(d=>d.uuid===CUR.uuid)||CUR.device;renderDetail();toast('Tag added');}
+  catch(e){toast('Add tag failed: '+e.message.slice(0,80));}}
+async function removeTag(t){
+  if(!(await uiConfirm({title:'Remove tag',message:'Remove tag "'+t+'" from every device in this cloud? Tags are namespace-wide on the server, so this deletes it everywhere — not just this device.',ok:'Remove tag',danger:true})))return;
+  try{await api(dapi('device_tags/'+encodeURIComponent(t)),{method:'DELETE'});
+    await loadDevices();CUR.device=DEVICES.find(d=>d.uuid===CUR.uuid)||CUR.device;renderDetail();toast('Tag removed');}
+  catch(e){toast('Remove failed: '+e.message.slice(0,80));}}
 
 // ---------- deploy (own + delegated, per hardware id) ----------
 async function deployPrompt(hwid){
