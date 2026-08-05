@@ -130,6 +130,10 @@ tbody tr.sel{background:var(--accent-weak)}
 .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600} .badge.ostree{background:var(--accent-weak);color:var(--accent)} .badge.binary{background:var(--warn-bg);color:var(--warn)} .badge.compose{background:var(--ok-bg);color:var(--ok)}
 .pdhdr{display:flex;gap:16px;align-items:flex-start;margin-bottom:14px} .pdhdr .ic{width:56px;height:56px;border-radius:13px;background:var(--accent-weak);color:var(--accent);display:grid;place-items:center;flex:none} .pdhdr .ic svg{width:28px;height:28px} .pdhdr h1{font-size:20px;margin:0 0 4px} .pdhdr .sub{color:var(--text-dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap} .pdhdr .dactions{display:flex;gap:9px;margin-left:auto}
 pre.code{margin:0;padding:14px 16px;background:#0a1119;color:#d6e2f0;font-family:var(--mono);font-size:12.5px;overflow:auto;white-space:pre;max-height:420px}
+.psort{padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:12.5px;font-family:inherit;cursor:pointer}
+.lswitch{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.lswitch button{border:0;background:var(--surface-2);color:var(--text-dim);padding:6px 9px;cursor:pointer;display:grid;place-items:center} .lswitch button svg{width:16px;height:16px} .lswitch button.on{background:var(--accent-weak);color:var(--accent)} .lswitch button+button{border-left:1px solid var(--border)}
+.md{font-size:13.5px;line-height:1.6} .md h4{font-size:15px;margin:.6em 0 .3em} .md h5{font-size:13.5px;margin:.6em 0 .3em} .md p{margin:.5em 0} .md ul,.md ol{margin:.4em 0;padding-left:22px} .md li{margin:.15em 0} .md code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:1px 5px;border-radius:5px} .md a{color:var(--accent)} .md pre.code{margin:.5em 0}
 .cmd{font-family:var(--mono);font-size:12.5px;background:#0a1119;color:#d6e2f0;border-color:#1d2a3a;white-space:pre-wrap;word-break:break-all}
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-weight:600;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:60} .toast.show{opacity:1;transform:translate(-50%,0)}
 /* ---- device detail ---- */
@@ -226,6 +230,12 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
           <div class="ptoolbar">
             <div class="seg" id="pkgSeg"></div>
             <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pkgSearch" placeholder="Search packages…" oninput="renderPackages()"></div>
+            <span class="grow"></span>
+            <select id="pkgSort" class="psort" onchange="setPkgSort(this.value)"><option value="date">Newest first</option><option value="date-asc">Oldest first</option><option value="name">Name A–Z</option></select>
+            <div class="lswitch" id="pkgLayoutSwitch">
+              <button data-l="grid" title="Grid view" onclick="setPkgLayout('grid')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+              <button data-l="list" title="List view" onclick="setPkgLayout('list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+            </div>
           </div>
           <div class="hwchips" id="pkgHwChips"></div>
           <div id="pkgGrid"><div class="empty">Loading…</div></div>
@@ -267,6 +277,7 @@ function setStatus(up){document.getElementById('dot').className='dot '+(up?'up':
 function pillClass(s){return s==='UpToDate'?'ok':(s==='Outdated'||s==='UpdatePending'||s==='UpdateScheduled')?'warn':(s==='Error')?'bad':'idle';}
 let DEVICES=[], INSTALLED={}, TARGETS=[], PKGS=[];
 let SOURCES=[], PKGCOUNTS={}, PKGSRC='mine', PKGHW=null, PKGVIEW=[], pkgGridSeq=0, PKGCUR=null;
+let PKGLAYOUT=(localStorage.getItem('pkgLayout')||'grid'), PKGSORT=(localStorage.getItem('pkgSort')||'date');
 let SEL=new Set(), FTAGS=new Set();   // selected device uuids + active tag filters
 
 const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Your packages and the feeds you subscribe to'],package:['Package','Package detail']};
@@ -613,6 +624,22 @@ function parseTarget(filename,c){ // delegated OSTree filename -> friendly displ
   const seg=String(filename||'').split('/');
   if(seg.length>=4){return {name:'Torizon OS · '+seg[1], variant:seg[3]||seg[2], branch:seg[0], board:seg[1]};}
   return {name:(c&&c.name)||filename, variant:'', branch:'', board:''};}
+function mdInline(s){return s
+  .replace(/`([^`]+)`/g,'<code>$1</code>')
+  .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+  .replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>')
+  .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');}
+function md(src){const e=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const L=String(src||'').replace(/\r\n?/g,'\n').split('\n');const out=[];let i=0;
+  while(i<L.length){let ln=L[i];
+    if(/^```/.test(ln)){const b=[];i++;while(i<L.length&&!/^```/.test(L[i])){b.push(e(L[i]));i++;}i++;out.push('<pre class="code">'+b.join('\n')+'</pre>');continue;}
+    const h=ln.match(/^(#{1,3})\s+(.*)$/);if(h){const n=h[1].length+3;out.push('<h'+n+'>'+mdInline(e(h[2]))+'</h'+n+'>');i++;continue;}
+    if(/^\s*[-*]\s+/.test(ln)){const it=[];while(i<L.length&&/^\s*[-*]\s+/.test(L[i])){it.push('<li>'+mdInline(e(L[i].replace(/^\s*[-*]\s+/,'')))+'</li>');i++;}out.push('<ul>'+it.join('')+'</ul>');continue;}
+    if(/^\s*\d+\.\s+/.test(ln)){const it=[];while(i<L.length&&/^\s*\d+\.\s+/.test(L[i])){it.push('<li>'+mdInline(e(L[i].replace(/^\s*\d+\.\s+/,'')))+'</li>');i++;}out.push('<ol>'+it.join('')+'</ol>');continue;}
+    if(/^\s*$/.test(ln)){i++;continue;}
+    const p=[];while(i<L.length&&!/^\s*$/.test(L[i])&&!/^(#{1,3}\s|```|\s*[-*]\s|\s*\d+\.\s)/.test(L[i])){p.push(e(L[i]));i++;}
+    out.push('<p>'+mdInline(p.join('<br>'))+'</p>');}
+  return out.join('\n');}
 async function loadTargets(){let signed;try{const r=await api(rapi('targets.json'));signed=r.signed||r;}catch(e){TARGETS=[];afterPkgData();return;}
   const t=signed.targets||{};
   TARGETS=Object.entries(t).map(([k,v])=>{const c=v.custom||{};return {key:k,name:c.name||k,version:c.version||'',hw:c.hardwareIds||[],hash:(v.hashes&&v.hashes.sha256)||'',length:v.length||0,format:c.targetFormat||'BINARY',uri:c.uri||null,description:c.description||'',createdAt:c.createdAt||''};});
@@ -628,23 +655,37 @@ function afterPkgData(){const t=document.getElementById('t-tgt');if(t)t.textCont
   if(document.getElementById('v-packages').classList.contains('active'))renderPackages();}
 function setPkgSource(s){PKGSRC=s;PKGHW=null;const el=document.getElementById('pkgSearch');if(el)el.value='';renderPackages();}
 function setPkgHw(hw){PKGHW=(PKGHW===hw?null:hw);renderPackages();}
+function setPkgLayout(l){PKGLAYOUT=l;localStorage.setItem('pkgLayout',l);renderPackages();}
+function setPkgSort(s){PKGSORT=s;localStorage.setItem('pkgSort',s);renderPackages();}
+function sortPkgs(arr){const a=arr.slice();
+  if(PKGSORT==='name')a.sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+  else a.sort((x,y)=>{const c=String(x.createdAt||'').localeCompare(String(y.createdAt||''));return PKGSORT==='date-asc'?c:-c;});
+  return a;}
 function pkgCard(p,i){const kind=pkgKind(p);
   return `<button class="pk" onclick="openPackage(${i})"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${pkgIcon(p.format,(p.hw||[]).join(' '))}</svg></span>
     <div class="g"><div class="nm" title="${esc(p.name)}">${esc(p.name)}</div><div class="ver">${esc(p.version||'—')}</div>
       <div class="row"><span class="badge ${kind}">${pkgLabel(kind)}</span>${(p.hw||[]).slice(0,1).map(h=>`<span class="tag">${esc(h)}</span>`).join('')}</div>
       <div class="row"><span class="src">${p.source==='mine'?'My package':esc(p.source)}${p.variant?' · '+esc(p.variant):''}</span></div></div></button>`;}
+function pkgRow(p,i){const kind=pkgKind(p);
+  return `<tr class="click" onclick="openPackage(${i})"><td><div class="dev"><span class="av" style="width:28px;height:28px;border-radius:7px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${pkgIcon(p.format,(p.hw||[]).join(' '))}</svg></span><div class="nm">${esc(p.name)}</div></div></td><td class="mono">${esc(p.version||'—')}</td><td>${(p.hw||[]).slice(0,1).map(h=>`<span class="tag">${esc(h)}</span>`).join('')||'<span class="muted">—</span>'}</td><td><span class="badge ${kind}">${pkgLabel(kind)}</span></td><td class="muted">${p.source==='mine'?'My package':esc(p.source)}</td><td class="muted">${p.createdAt?relTime(p.createdAt):'—'}</td></tr>`;}
+function renderPkgItems(list,extraNote){
+  if(!list.length)return '<div class="empty">No packages match.</div>';
+  if(PKGLAYOUT==='list')return `<div class="tablewrap"><table><thead><tr><th>Name</th><th>Version</th><th>Hardware</th><th>Format</th><th>Source</th><th>Updated</th></tr></thead><tbody>${list.map((p,i)=>pkgRow(p,i)).join('')}</tbody></table></div>${extraNote||''}`;
+  return `<div class="pgrid">${list.map((p,i)=>pkgCard(p,i)).join('')}</div>${extraNote||''}`;}
+function syncLayoutSwitch(){const sw=document.getElementById('pkgLayoutSwitch');if(sw)sw.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.l===PKGLAYOUT));const so=document.getElementById('pkgSort');if(so)so.value=PKGSORT;}
 function renderPackages(){
   const seg=document.getElementById('pkgSeg');if(!seg)return;
   seg.innerHTML=`<button class="${PKGSRC==='mine'?'on':''}" onclick="setPkgSource('mine')">My packages <span class="n">${TARGETS.length}</span></button>`+
     SOURCES.map(s=>`<button class="${PKGSRC===s.name?'on':''}" onclick="setPkgSource('${esc(s.name)}')">${esc(s.friendlyName)} <span class="n">${s.count}</span></button>`).join('');
+  syncLayoutSwitch();
   const q=(document.getElementById('pkgSearch')?.value||'').toLowerCase().trim();
   const chips=document.getElementById('pkgHwChips'),grid=document.getElementById('pkgGrid');
   if(PKGSRC==='mine'){
     chips.innerHTML='';
-    PKGVIEW=TARGETS.filter(t=>!q||((t.name+' '+t.version+' '+t.hw.join(' ')).toLowerCase().includes(q)))
-      .map(t=>({source:'mine',key:t.key,name:t.name,version:t.version,hw:t.hw,format:t.format,hash:t.hash,length:t.length,uri:t.uri,description:t.description}));
+    PKGVIEW=sortPkgs(TARGETS.filter(t=>!q||((t.name+' '+t.version+' '+t.hw.join(' ')).toLowerCase().includes(q)))
+      .map(t=>({source:'mine',key:t.key,name:t.name,version:t.version,hw:t.hw,format:t.format,hash:t.hash,length:t.length,uri:t.uri,description:t.description,createdAt:t.createdAt})));
     document.getElementById('pkgCount').textContent=PKGVIEW.length;
-    grid.innerHTML=PKGVIEW.length?`<div class="pgrid">${PKGVIEW.map((p,i)=>pkgCard(p,i)).join('')}</div>`:('<div class="empty">'+(q?'No packages match your search.':'No packages yet — click Upload to add one.')+'</div>');
+    grid.innerHTML=PKGVIEW.length?renderPkgItems(PKGVIEW):('<div class="empty">'+(q?'No packages match your search.':'No packages yet — click Upload to add one.')+'</div>');
   } else { renderDelegatedGrid(q); }
 }
 async function renderDelegatedGrid(q){
@@ -657,11 +698,12 @@ async function renderDelegatedGrid(q){
   const hws=[...new Set(items.flatMap(it=>((it.clientTargetItem&&it.clientTargetItem.custom&&it.clientTargetItem.custom.hardwareIds)||[])))].sort();
   chips.innerHTML=hws.slice(0,24).map(h=>`<span class="tchip ${PKGHW===h?'on':''}" onclick="setPkgHw('${esc(h)}')">${esc(h)}</span>`).join('')+(hws.length>24?`<span class="tchip muted">+${hws.length-24} more</span>`:'');
   const list=items.filter(it=>{const hw=(it.clientTargetItem&&it.clientTargetItem.custom&&it.clientTargetItem.custom.hardwareIds)||[];return !PKGHW||hw.includes(PKGHW);});
-  PKGVIEW=list.map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{},pt=parseTarget(it.targetFilename,c);
-    return {source:PKGSRC,filename:it.targetFilename,name:pt.name,version:c.version||'',hw:c.hardwareIds||[],format:c.targetFormat||'',hash:h.sha256||'',length:(it.clientTargetItem&&it.clientTargetItem.length)||0,uri:c.uri||null,variant:pt.variant,branch:pt.branch,board:pt.board,createdAt:c.createdAt||'',sbom:((c.supplyChainInfo||{})['cyclonedx+vex']||{}).url||''};});
+  PKGVIEW=sortPkgs(list.map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{},pt=parseTarget(it.targetFilename,c);
+    return {source:PKGSRC,filename:it.targetFilename,name:pt.name,version:c.version||'',hw:c.hardwareIds||[],format:c.targetFormat||'',hash:h.sha256||'',length:(it.clientTargetItem&&it.clientTargetItem.length)||0,uri:c.uri||null,variant:pt.variant,branch:pt.branch,board:pt.board,createdAt:c.createdAt||'',sbom:((c.supplyChainInfo||{})['cyclonedx+vex']||{}).url||''};}));
   document.getElementById('pkgCount').textContent=PKGVIEW.length;
-  const CAP=60,shown=PKGVIEW.slice(0,CAP);
-  grid.innerHTML=PKGVIEW.length?`<div class="pgrid">${shown.map((p,i)=>pkgCard(p,i)).join('')}</div>${PKGVIEW.length>CAP?`<div class="muted" style="padding:0 18px 16px;font-size:12px">Showing ${CAP} of ${PKGVIEW.length} — refine with search or a hardware filter.</div>`:''}`:'<div class="empty">No packages match.</div>';
+  const CAP=PKGLAYOUT==='list'?200:60,shown=PKGVIEW.slice(0,CAP);
+  const note=PKGVIEW.length>CAP?`<div class="muted" style="padding:0 18px 16px;font-size:12px">Showing ${CAP} of ${PKGVIEW.length} — refine with search or a hardware filter.</div>`:'';
+  grid.innerHTML=renderPkgItems(shown,note);
 }
 
 // ---------- sources (managed from the gear modal) ----------
@@ -718,7 +760,8 @@ function openUpload(){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label class="ml">Version</label><input class="mf" id="upVer" placeholder="1.0.0"></div>
         <div><label class="ml">Hardware id</label><input class="mf" id="upHw" placeholder="docker-compose"></div></div>
-      <label class="ml">File</label><input class="mf" type="file" id="upFile">
+      <label class="ml">File</label><input class="mf" type="file" id="upFile" style="margin-bottom:12px">
+      <label class="ml">Description <span class="muted" style="font-weight:400">— optional, Markdown supported</span></label><textarea class="mf" id="upDesc" rows="4" placeholder="## What this does&#10;- feature one&#10;- feature two&#10;&#10;See &#96;docker-compose.yml&#96;."></textarea>
       <div class="msg" id="upMsg" style="margin-top:10px"></div>
     </div>
     <footer><button class="btn mcancel" onclick="closeUpload()">Cancel</button><button class="btn primary" id="upBtn" onclick="doUpload()">Upload</button></footer></div>`;
@@ -726,11 +769,13 @@ function openUpload(){
   document.body.appendChild(ov);document.getElementById('upName').focus();
 }
 function closeUpload(){const m=document.getElementById('upModal');if(m)m.remove();}
-async function doUpload(){const name=document.getElementById('upName').value.trim(),ver=document.getElementById('upVer').value.trim(),hw=document.getElementById('upHw').value.trim(),file=document.getElementById('upFile').files[0],msg=document.getElementById('upMsg'),btn=document.getElementById('upBtn');
+async function doUpload(){const name=document.getElementById('upName').value.trim(),ver=document.getElementById('upVer').value.trim(),hw=document.getElementById('upHw').value.trim(),file=document.getElementById('upFile').files[0],desc=document.getElementById('upDesc').value.trim(),msg=document.getElementById('upMsg'),btn=document.getElementById('upBtn');
   if(!name||!ver||!hw||!file)return showMsg(msg,'err','Fill name, version, hardware id and pick a file.');
   const target=`${name}-${ver}`,q=`name=${encodeURIComponent(name)}&version=${encodeURIComponent(ver)}&hardwareIds=${encodeURIComponent(hw)}`;const fd=new FormData();fd.append('file',file);
   btn.disabled=true;showMsg(msg,'ok','Uploading '+file.name+'…');
-  try{await api(rapi(`targets/${encodeURIComponent(target)}?${q}`),{method:'PUT',body:fd});await loadTargets();closeUpload();PKGSRC='mine';renderPackages();toast('✓ Uploaded '+target);}catch(e){showMsg(msg,'err','Upload failed: '+e.message);btn.disabled=false;}}
+  try{await api(rapi(`targets/${encodeURIComponent(target)}?${q}`),{method:'PUT',body:fd});
+    if(desc){try{await api(rapi('proprietary-custom/'+encodeURIComponent(target)),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc})});}catch(e){}}
+    await loadTargets();closeUpload();PKGSRC='mine';renderPackages();toast('✓ Uploaded '+target);}catch(e){showMsg(msg,'err','Upload failed: '+e.message);btn.disabled=false;}}
 
 // ---------- package detail ----------
 async function openPackage(i){const p=PKGVIEW[i];if(!p)return;PKGCUR=p;go('package');
@@ -751,8 +796,8 @@ function renderPkgDetail(compose){const p=PKGCUR;if(!p)return;const kind=pkgKind
       <div class="dactions"><button class="btn primary" onclick="pkgDeploy()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Deploy to device</button>${mine?`<button class="btn dbad" onclick="deletePackage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13h10l1-13"/></svg> Delete</button>`:''}</div></div>
     <div class="card"><header>${H('<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>')}<h2>Overview</h2></header><dl class="kv" style="padding:16px 18px;margin:0">${meta}</dl></div>
     ${compose!=null?`<div class="card"><header>${H('<path d="M4 7h7v7H4zM13 7h7v4h-7zM13 13h7v4h-7z"/>')}<h2>Compose file</h2></header><pre class="code">${esc(compose)}</pre></div>`:''}
-    ${p.sbom?`<div class="card"><header>${H('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/>')}<h2>Software bill of materials</h2></header><div class="pad" style="padding:16px 18px"><a class="link" href="${esc(p.sbom)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">View SBOM (CycloneDX + VEX) ↗</a></div></div>`:''}
-    ${mine?`<div class="card"><header>${H('<path d="M4 6h16M4 12h16M4 18h10"/>')}<h2>Description</h2><span class="grow"></span><button class="btn sm ghost" onclick="editPkgDescription()">Edit</button></header><div class="pad" style="padding:16px 18px">${p.description?esc(p.description):'<span class="muted">No description yet. Descriptions are stored on your own package metadata (not available for delegated feeds).</span>'}</div></div>`:''}`;
+    ${p.sbom?`<div class="card"><header>${H('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/>')}<h2>Software bill of materials</h2></header><div class="pad" style="padding:16px 18px"><a class="link" href="${esc(p.sbom)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">View SBOM (CycloneDX + VEX) ↗</a> <span class="muted" style="font-size:12px">— may require access; some publishers protect their SBOMs.</span></div></div>`:''}
+    ${mine?`<div class="card"><header>${H('<path d="M4 6h16M4 12h16M4 18h10"/>')}<h2>Description</h2><span class="grow"></span><button class="btn sm ghost" onclick="editPkgDescription()">Edit</button></header><div class="pad" style="padding:16px 18px">${p.description?`<div class="md">${md(p.description)}</div>`:'<span class="muted">No description yet. Descriptions live on your own package metadata (Markdown supported); not available for delegated feeds.</span>'}</div></div>`:''}`;
 }
 async function pkgDeploy(){const p=PKGCUR;if(!p)return;
   const hw=(p.hw||[])[0];if(!hw)return toast('Package has no hardware id.');
