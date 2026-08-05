@@ -111,6 +111,25 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:po
 tbody tr.sel{background:var(--accent-weak)}
 .card.dz{border-color:color-mix(in srgb,var(--bad) 35%,var(--border))}
 .dzrow{display:flex;align-items:center;gap:14px;padding:16px 18px} .dzrow .g{flex:1} .dzrow .t{font-weight:640} .dzrow .s{color:var(--text-dim);font-size:13px}
+/* packages (app-store) */
+.ptoolbar{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.ptoolbar .search{position:relative;flex:1;max-width:300px;min-width:170px}
+.ptoolbar .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-faint)}
+.ptoolbar .search input{width:100%;padding:8px 11px 8px 33px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:13.5px;font-family:inherit} .ptoolbar .search input:focus{outline:none;border-color:var(--accent)}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;color:var(--text-dim);font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.seg button.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+.seg .n{font-size:11px;background:var(--surface-3);color:var(--text-dim);border-radius:20px;padding:0 6px}
+.hwchips{display:flex;gap:7px;flex-wrap:wrap;padding:12px 18px 0} .hwchips:empty{display:none}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px 18px}
+.pk{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);cursor:pointer;transition:border-color .12s,transform .12s;text-align:left}
+.pk:hover{border-color:var(--accent);transform:translateY(-1px)}
+.pk .ic{width:42px;height:42px;border-radius:10px;background:var(--accent-weak);color:var(--accent);display:grid;place-items:center;flex:none} .pk .ic svg{width:22px;height:22px}
+.pk .g{min-width:0;flex:1} .pk .nm{font-weight:660;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .pk .ver{font-family:var(--mono);font-size:12px;color:var(--text-dim)}
+.pk .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center} .pk .src{font-size:11px;color:var(--text-faint)}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600} .badge.ostree{background:var(--accent-weak);color:var(--accent)} .badge.binary{background:var(--warn-bg);color:var(--warn)} .badge.compose{background:var(--ok-bg);color:var(--ok)}
+.pdhdr{display:flex;gap:16px;align-items:flex-start;margin-bottom:14px} .pdhdr .ic{width:56px;height:56px;border-radius:13px;background:var(--accent-weak);color:var(--accent);display:grid;place-items:center;flex:none} .pdhdr .ic svg{width:28px;height:28px} .pdhdr h1{font-size:20px;margin:0 0 4px} .pdhdr .sub{color:var(--text-dim);display:flex;gap:8px;align-items:center;flex-wrap:wrap} .pdhdr .dactions{display:flex;gap:9px;margin-left:auto}
+pre.code{margin:0;padding:14px 16px;background:#0a1119;color:#d6e2f0;font-family:var(--mono);font-size:12.5px;overflow:auto;white-space:pre;max-height:420px}
 .cmd{font-family:var(--mono);font-size:12.5px;background:#0a1119;color:#d6e2f0;border-color:#1d2a3a;white-space:pre-wrap;word-break:break-all}
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-weight:600;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:60} .toast.show{opacity:1;transform:translate(-50%,0)}
 /* ---- device detail ---- */
@@ -160,7 +179,6 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
       <a data-view="devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Devices<span class="badge" id="nav-dev">0</span></a>
       <div class="lbl">Software</div>
       <a data-view="packages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>Packages<span class="badge" id="nav-tgt">0</span></a>
-      <a data-view="sources"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>Package Sources<span class="badge" id="nav-src">0</span></a>
     </nav>
     <div class="foot"><span class="dot" id="dot"></span> <span id="status">connecting…</span></div>
   </aside>
@@ -201,39 +219,20 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
       <section class="view" id="v-device"><div id="devDetail"></div></section>
 
       <section class="view" id="v-packages">
-        <div class="cards" style="grid-template-columns:1.6fr 1fr;align-items:start">
-          <div class="card"><header><h2>Your packages</h2><span class="count" id="tgt-count">0</span></header>
-            <div class="tablewrap" id="tgtWrap"><div class="empty">Loading…</div></div></div>
-          <div class="card"><header><h2>Upload a version</h2></header>
-            <div class="form">
-              <div><label><span class="l">Name</span><input id="upName" placeholder="fleet-config"></label></div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <label><span class="l">Version</span><input id="upVer" placeholder="1.0.0"></label>
-                <label><span class="l">Hardware id</span><input id="upHw" placeholder="intel-corei7-64"></label>
-              </div>
-              <div><label><span class="l">Binary file</span><input type="file" id="upFile"></label></div>
-              <button class="btn primary" id="upBtn" onclick="uploadVersion()">Upload →</button>
-              <div class="msg" id="upMsg"></div>
-            </div></div>
+        <div class="card"><header><h2>Packages</h2><span class="count" id="pkgCount">0</span><span class="grow"></span>
+          <button class="btn sm" onclick="openSources()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V19a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.2 5.4l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H23a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Manage sources</button>
+          <button class="btn sm primary" onclick="openUpload()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>Upload</button>
+        </header>
+          <div class="ptoolbar">
+            <div class="seg" id="pkgSeg"></div>
+            <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pkgSearch" placeholder="Search packages…" oninput="renderPackages()"></div>
+          </div>
+          <div class="hwchips" id="pkgHwChips"></div>
+          <div id="pkgGrid"><div class="empty">Loading…</div></div>
         </div>
       </section>
 
-      <section class="view" id="v-sources">
-        <div class="card"><header><h2>Package sources</h2><span class="count" id="src-count">0</span></header>
-          <div id="srcWrap"><div class="empty">Loading…</div></div>
-          <div class="form" style="border-top:1px solid var(--border)">
-            <div><label><span class="l">Add a source — paste the delegation config JSON, or a URL to it</span>
-              <textarea id="srcJson" rows="3" placeholder='https://…/delegations/add-tdx-quarterly.json    — or paste the JSON: {"keys":[…],"delegationMetadata":{"name":"…","paths":["*/release-*"],"threshold":1},"fetchUrl":{"uri":"https://…"}}'></textarea></label></div>
-            <button class="btn primary" id="srcBtn" onclick="addSource()" style="align-self:start">Add package source →</button>
-            <div class="msg" id="srcMsg"></div>
-          </div>
-        </div>
-        <div class="card"><header><h2>Browse packages</h2><span class="count" id="pkg-count">0</span><span class="grow"></span>
-          <input id="pkgSearch" placeholder="filter — nightly, imx8, camera…" style="width:230px;padding:7px 11px" oninput="browsePackages()">
-          <select id="pkgDevice" style="width:auto;padding:7px 11px"></select></header>
-          <div id="pkgWrap"><div class="empty">Type to search, or clear to list.</div></div>
-        </div>
-      </section>
+      <section class="view" id="v-package"><div id="pkgDetail"></div></section>
     </div>
   </div>
 </div>
@@ -267,12 +266,14 @@ function showMsg(el,cls,txt){if(el){el.className='msg show '+cls;el.textContent=
 function setStatus(up){document.getElementById('dot').className='dot '+(up?'up':'down');document.getElementById('status').textContent=up?('connected · '+location.host):'backend unreachable';}
 function pillClass(s){return s==='UpToDate'?'ok':(s==='Outdated'||s==='UpdatePending'||s==='UpdateScheduled')?'warn':(s==='Error')?'bad':'idle';}
 let DEVICES=[], INSTALLED={}, TARGETS=[], PKGS=[];
+let SOURCES=[], PKGCOUNTS={}, PKGSRC='mine', PKGHW=null, PKGVIEW=[], pkgGridSeq=0, PKGCUR=null;
 let SEL=new Set(), FTAGS=new Set();   // selected device uuids + active tag filters
 
-const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Software versions you host on this cloud'],sources:['Package Sources','External TUF delegations you trust']};
+const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Your packages and the feeds you subscribe to'],package:['Package','Package detail']};
 function go(v){document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
-  const tt2=TITLES[v]||TITLES.devices;document.getElementById('ptitle').textContent=tt2[0];document.getElementById('psub').textContent=tt2[1];window.scrollTo(0,0);}
+  const tt2=TITLES[v]||TITLES.devices;document.getElementById('ptitle').textContent=tt2[0];document.getElementById('psub').textContent=tt2[1];window.scrollTo(0,0);
+  if(v==='packages')renderPackages();}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-view]');if(a){e.preventDefault();go(a.dataset.view);}});
 function toggleTheme(){const r=document.documentElement;const cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',cur==='dark'?'light':'dark');}
 
@@ -303,7 +304,6 @@ function renderDevices(){
       <div class="row"><span class="sw" style="background:var(--warn)"></span> Updating / outdated <span class="n num">${by.warn||0}</span></div>
       <div class="row"><span class="sw" style="background:var(--bad)"></span> Error <span class="n num">${by.bad||0}</span></div>
       <div class="row"><span class="sw" style="background:var(--idle)"></span> Not seen <span class="n num">${by.idle||0}</span></div></div>`;
-  fillPkgDevice();
 }
 const trashSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13h10l1-13"/></svg>';
 function allTags(){const s=new Set();DEVICES.forEach(d=>Object.keys(d.attributes||{}).forEach(t=>s.add(t)));return[...s].sort();}
@@ -601,25 +601,86 @@ async function deployPrompt(hwid){
   }catch(e){toast('Deploy failed: '+e.message);}
 }
 
-// ---------- your packages ----------
-async function loadTargets(){let signed;try{const r=await api(rapi('targets.json'));signed=r.signed||r;}catch(e){TARGETS=[];renderTargets();return;}
-  const t=signed.targets||{};TARGETS=Object.entries(t).map(([k,v])=>({key:k,name:(v.custom&&v.custom.name)||k,version:(v.custom&&v.custom.version)||'',hw:(v.custom&&v.custom.hardwareIds)||[],hash:(v.hashes&&v.hashes.sha256)||'',length:v.length||0}));renderTargets();}
-function renderTargets(){document.getElementById('nav-tgt').textContent=TARGETS.length;document.getElementById('tgt-count').textContent=TARGETS.length;document.getElementById('t-tgt').textContent=TARGETS.length;
-  document.getElementById('tgtWrap').innerHTML=TARGETS.length?`<table><thead><tr><th>Name</th><th>Version</th><th>Hardware</th><th>SHA256</th></tr></thead><tbody>${TARGETS.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td class="mono">${esc(t.version)}</td><td><span class="tag">${esc(t.hw.join(', '))}</span></td><td class="mono muted">${esc(shortHash(t.hash))}…</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No versions uploaded yet.</div>';}
-async function uploadVersion(){const name=document.getElementById('upName').value.trim(),ver=document.getElementById('upVer').value.trim(),hw=document.getElementById('upHw').value.trim(),file=document.getElementById('upFile').files[0];const msg=document.getElementById('upMsg'),btn=document.getElementById('upBtn');
-  if(!name||!ver||!hw||!file)return showMsg(msg,'err','Fill name, version, hardware id and pick a file.');
-  const target=`${name}-${ver}`,q=`name=${encodeURIComponent(name)}&version=${encodeURIComponent(ver)}&hardwareIds=${encodeURIComponent(hw)}`;const fd=new FormData();fd.append('file',file);
-  btn.disabled=true;showMsg(msg,'ok','Uploading '+file.name+'…');
-  try{await api(rapi(`targets/${encodeURIComponent(target)}?${q}`),{method:'PUT',body:fd});showMsg(msg,'ok','✓ Uploaded '+target+'.');document.getElementById('upFile').value='';await loadTargets();}catch(e){showMsg(msg,'err','Upload failed: '+e.message);}finally{btn.disabled=false;}}
-
-// ---------- sources ----------
+// ---------- packages (unified: my packages + delegated sources) ----------
+function pkgIcon(fmt,hw){const s=(hw||'')+' '+(fmt||'');
+  if(/docker/i.test(s))return '<path d="M4 7h7v7H4zM13 7h7v4h-7zM13 13h7v4h-7z"/>';
+  if(/ostree/i.test(fmt||''))return '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>';
+  return '<rect x="4" y="4" width="16" height="16" rx="2"/>';}
+function isCompose(p){return (p.hw||[]).some(h=>/docker/i.test(h));}
+function pkgKind(p){return isCompose(p)?'compose':(/ostree/i.test(p.format||'')?'ostree':'binary');}
+function pkgLabel(kind){return kind==='compose'?'docker-compose':kind==='ostree'?'OSTree':'binary';}
+function parseTarget(filename,c){ // delegated OSTree filename -> friendly display
+  const seg=String(filename||'').split('/');
+  if(seg.length>=4){return {name:'Torizon OS · '+seg[1], variant:seg[3]||seg[2], branch:seg[0], board:seg[1]};}
+  return {name:(c&&c.name)||filename, variant:'', branch:'', board:''};}
+async function loadTargets(){let signed;try{const r=await api(rapi('targets.json'));signed=r.signed||r;}catch(e){TARGETS=[];afterPkgData();return;}
+  const t=signed.targets||{};
+  TARGETS=Object.entries(t).map(([k,v])=>{const c=v.custom||{};return {key:k,name:c.name||k,version:c.version||'',hw:c.hardwareIds||[],hash:(v.hashes&&v.hashes.sha256)||'',length:v.length||0,format:c.targetFormat||'BINARY',uri:c.uri||null,description:c.description||'',createdAt:c.createdAt||''};});
+  afterPkgData();}
 async function loadSources(){let roles=[];try{roles=await api(rapi('trusted-delegations'))||[];}catch(e){roles=[];}
-  let counts={};try{const di=await api(rapi('delegations_items'));(di.values||di||[]).forEach(it=>{counts[it.delegatedRoleName]=(counts[it.delegatedRoleName]||0)+1;});}catch(e){}
+  PKGCOUNTS={};try{const di=await api(rapi('delegations_items'));(di.values||di||[]).forEach(it=>{PKGCOUNTS[it.delegatedRoleName]=(PKGCOUNTS[it.delegatedRoleName]||0)+1;});}catch(e){}
   const infos=await Promise.all(roles.map(r=>api(rapi('trusted-delegations/'+encodeURIComponent(r.name)+'/info')).catch(()=>({}))));
-  document.getElementById('nav-src').textContent=roles.length;document.getElementById('src-count').textContent=roles.length;document.getElementById('t-src').textContent=roles.length;
-  const tot=Object.values(counts).reduce((a,b)=>a+b,0);document.getElementById('t-src-m').textContent=tot+' packages available';
-  document.getElementById('srcWrap').innerHTML=roles.length?roles.map((r,i)=>{const info=infos[i]||{},n=counts[r.name]||0;
-    return `<div class="srcrow"><span class="pill acc"><span class="d"></span>verified</span><div class="grow"><div class="nm">${esc(info.friendlyName||r.name)}</div><div class="muted mono" style="font-size:12px">${esc(r.name)} · paths ${esc((r.paths||[]).join(', '))} · ${info.lastFetched?('fetched '+relTime(info.lastFetched)):'not fetched'}</div></div><span class="tag">${n} packages</span><button class="btn sm" onclick="refreshSource('${esc(r.name)}')">Refresh</button><button class="btn sm danger" onclick="removeSource('${esc(r.name)}')">Remove</button></div>`;}).join(''):'<div class="empty">No external package sources yet.</div>';}
+  SOURCES=roles.map((r,i)=>({name:r.name,friendlyName:(infos[i]||{}).friendlyName||r.name,paths:r.paths||[],lastFetched:(infos[i]||{}).lastFetched||null,count:PKGCOUNTS[r.name]||0}));
+  const ts=document.getElementById('t-src');if(ts)ts.textContent=SOURCES.length;
+  const tm=document.getElementById('t-src-m');if(tm)tm.textContent=Object.values(PKGCOUNTS).reduce((a,b)=>a+b,0)+' packages available';
+  afterPkgData();}
+function afterPkgData(){const t=document.getElementById('t-tgt');if(t)t.textContent=TARGETS.length;const nv=document.getElementById('nav-tgt');if(nv)nv.textContent=TARGETS.length;
+  if(document.getElementById('v-packages').classList.contains('active'))renderPackages();}
+function setPkgSource(s){PKGSRC=s;PKGHW=null;const el=document.getElementById('pkgSearch');if(el)el.value='';renderPackages();}
+function setPkgHw(hw){PKGHW=(PKGHW===hw?null:hw);renderPackages();}
+function pkgCard(p,i){const kind=pkgKind(p);
+  return `<button class="pk" onclick="openPackage(${i})"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${pkgIcon(p.format,(p.hw||[]).join(' '))}</svg></span>
+    <div class="g"><div class="nm" title="${esc(p.name)}">${esc(p.name)}</div><div class="ver">${esc(p.version||'—')}</div>
+      <div class="row"><span class="badge ${kind}">${pkgLabel(kind)}</span>${(p.hw||[]).slice(0,1).map(h=>`<span class="tag">${esc(h)}</span>`).join('')}</div>
+      <div class="row"><span class="src">${p.source==='mine'?'My package':esc(p.source)}${p.variant?' · '+esc(p.variant):''}</span></div></div></button>`;}
+function renderPackages(){
+  const seg=document.getElementById('pkgSeg');if(!seg)return;
+  seg.innerHTML=`<button class="${PKGSRC==='mine'?'on':''}" onclick="setPkgSource('mine')">My packages <span class="n">${TARGETS.length}</span></button>`+
+    SOURCES.map(s=>`<button class="${PKGSRC===s.name?'on':''}" onclick="setPkgSource('${esc(s.name)}')">${esc(s.friendlyName)} <span class="n">${s.count}</span></button>`).join('');
+  const q=(document.getElementById('pkgSearch')?.value||'').toLowerCase().trim();
+  const chips=document.getElementById('pkgHwChips'),grid=document.getElementById('pkgGrid');
+  if(PKGSRC==='mine'){
+    chips.innerHTML='';
+    PKGVIEW=TARGETS.filter(t=>!q||((t.name+' '+t.version+' '+t.hw.join(' ')).toLowerCase().includes(q)))
+      .map(t=>({source:'mine',key:t.key,name:t.name,version:t.version,hw:t.hw,format:t.format,hash:t.hash,length:t.length,uri:t.uri,description:t.description}));
+    document.getElementById('pkgCount').textContent=PKGVIEW.length;
+    grid.innerHTML=PKGVIEW.length?`<div class="pgrid">${PKGVIEW.map((p,i)=>pkgCard(p,i)).join('')}</div>`:('<div class="empty">'+(q?'No packages match your search.':'No packages yet — click Upload to add one.')+'</div>');
+  } else { renderDelegatedGrid(q); }
+}
+async function renderDelegatedGrid(q){
+  const grid=document.getElementById('pkgGrid'),chips=document.getElementById('pkgHwChips'),seq=++pkgGridSeq;
+  grid.innerHTML='<div class="empty">Loading…</div>';
+  let items=[];
+  try{const di=await api(rapi('delegations_items'+(q?('?nameContains='+encodeURIComponent(q)):'')));items=(di.values||di||[]).filter(it=>it.delegatedRoleName===PKGSRC);}
+  catch(e){if(seq!==pkgGridSeq)return;grid.innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>';return;}
+  if(seq!==pkgGridSeq)return;
+  const hws=[...new Set(items.flatMap(it=>((it.clientTargetItem&&it.clientTargetItem.custom&&it.clientTargetItem.custom.hardwareIds)||[])))].sort();
+  chips.innerHTML=hws.slice(0,24).map(h=>`<span class="tchip ${PKGHW===h?'on':''}" onclick="setPkgHw('${esc(h)}')">${esc(h)}</span>`).join('')+(hws.length>24?`<span class="tchip muted">+${hws.length-24} more</span>`:'');
+  const list=items.filter(it=>{const hw=(it.clientTargetItem&&it.clientTargetItem.custom&&it.clientTargetItem.custom.hardwareIds)||[];return !PKGHW||hw.includes(PKGHW);});
+  PKGVIEW=list.map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{},pt=parseTarget(it.targetFilename,c);
+    return {source:PKGSRC,filename:it.targetFilename,name:pt.name,version:c.version||'',hw:c.hardwareIds||[],format:c.targetFormat||'',hash:h.sha256||'',length:(it.clientTargetItem&&it.clientTargetItem.length)||0,uri:c.uri||null,variant:pt.variant,branch:pt.branch,board:pt.board,createdAt:c.createdAt||'',sbom:((c.supplyChainInfo||{})['cyclonedx+vex']||{}).url||''};});
+  document.getElementById('pkgCount').textContent=PKGVIEW.length;
+  const CAP=60,shown=PKGVIEW.slice(0,CAP);
+  grid.innerHTML=PKGVIEW.length?`<div class="pgrid">${shown.map((p,i)=>pkgCard(p,i)).join('')}</div>${PKGVIEW.length>CAP?`<div class="muted" style="padding:0 18px 16px;font-size:12px">Showing ${CAP} of ${PKGVIEW.length} — refine with search or a hardware filter.</div>`:''}`:'<div class="empty">No packages match.</div>';
+}
+
+// ---------- sources (managed from the gear modal) ----------
+function openSources(){
+  const ov=document.createElement('div');ov.className='modal open';ov.id='srcModal';
+  ov.innerHTML=`<div class="m"><header><h3>Package sources</h3><span class="grow"></span><button class="iconbtn" onclick="closeSources()" style="width:30px;height:30px;border:0;background:transparent;cursor:pointer;color:var(--text-dim)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+    <div id="srcList"></div>
+    <div class="form" style="border-top:1px solid var(--border);padding:16px 18px">
+      <div><label><span class="l">Add a source — paste the delegation config JSON, or a URL to it</span>
+        <textarea id="srcJson" rows="3" placeholder='https://…/delegations/add-tdx-quarterly.json  — or paste the JSON'></textarea></label></div>
+      <button class="btn primary" id="srcBtn" onclick="addSource()" style="align-self:start">Add source →</button>
+      <div class="msg" id="srcMsg"></div>
+    </div></div>`;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)closeSources();});
+  document.body.appendChild(ov);renderSourcesModal();
+}
+function closeSources(){const m=document.getElementById('srcModal');if(m)m.remove();}
+function renderSourcesModal(){const el=document.getElementById('srcList');if(!el)return;
+  el.innerHTML=SOURCES.length?SOURCES.map(s=>`<div class="srcrow"><span class="pill acc"><span class="d"></span>verified</span><div class="grow"><div class="nm">${esc(s.friendlyName)}</div><div class="muted mono" style="font-size:12px">${esc(s.name)} · ${esc((s.paths||[]).join(', '))} · ${s.lastFetched?('fetched '+relTime(s.lastFetched)):'not fetched'}</div></div><span class="tag">${s.count} pkgs</span><button class="btn sm" onclick="refreshSource('${esc(s.name)}')">Refresh</button><button class="btn sm danger" onclick="removeSource('${esc(s.name)}')">Remove</button></div>`).join(''):'<div class="empty">No package sources yet — add one below.</div>';}
 async function addSource(){const msg=document.getElementById('srcMsg'),btn=document.getElementById('srcBtn');
   const raw=(document.getElementById('srcJson').value||'').trim();
   if(!raw)return showMsg(msg,'err','Paste a delegation URL or its JSON.');
@@ -644,23 +705,75 @@ async function addSource(){const msg=document.getElementById('srcMsg'),btn=docum
     await api(rapi('trusted-delegations/keys'),{method:'PUT',headers:HH,body:JSON.stringify(mergedKeys)});
     await api(rapi('trusted-delegations'),{method:'PUT',headers:HH,body:JSON.stringify(mergedRoles)});
     await api(rapi('trusted-delegations/'+encodeURIComponent(dm.name)+'/remote'),{method:'PUT',headers:HH,body:JSON.stringify({uri:uri,friendlyName:cfg.friendlyName||dm.name})});
-    showMsg(msg,'ok','✓ Source "'+dm.name+'" added and verified.');document.getElementById('srcJson').value='';await loadSources();}catch(e){showMsg(msg,'err','Failed: '+e.message);}finally{btn.disabled=false;}}
-async function refreshSource(n){try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)+'/remote/refresh'),{method:'PUT'});toast('Refreshed');await loadSources();}catch(e){toast('Refresh failed: '+e.message);}}
-async function removeSource(n){if(!(await uiConfirm({title:'Remove package source',message:'Remove "'+n+'"? Devices will no longer receive targets from this source.',ok:'Remove',danger:true})))return;try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)),{method:'DELETE'});toast('Removed');await loadSources();}catch(e){toast('Remove failed: '+e.message);}}
-function fillPkgDevice(){const el=document.getElementById('pkgDevice');if(el)el.innerHTML=DEVICES.map(d=>`<option value="${esc(d.uuid)}">${esc(d.deviceName||d.deviceId)}</option>`).join('')||'<option value="">no devices</option>';}
-let pkgTimer;function browsePackages(){clearTimeout(pkgTimer);pkgTimer=setTimeout(async()=>{const q=document.getElementById('pkgSearch').value.trim(),w=document.getElementById('pkgWrap');
-  try{const di=await api(rapi('delegations_items'+(q?('?nameContains='+encodeURIComponent(q)):'')));const items=(di.values||di||[]);document.getElementById('pkg-count').textContent=items.length;
-    if(!items.length){w.innerHTML='<div class="empty">No matching packages.</div>';return;}
-    PKGS=items.slice(0,25).map(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{};return {filename:it.targetFilename,hash:h.sha256,uri:c.uri,hw:(c.hardwareIds||[]),format:c.targetFormat||'',len:(it.clientTargetItem&&it.clientTargetItem.length)||0};});
-    w.innerHTML=`<div class="msg" id="pkgMsg"></div><div class="tablewrap"><table><thead><tr><th>Package</th><th>Hardware</th><th>Format</th><th class="right">Deploy</th></tr></thead><tbody>${PKGS.map((p,i)=>`<tr><td class="mono" style="max-width:430px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.filename)}">${esc(p.filename)}</td><td><span class="tag">${esc(p.hw.join(','))}</span></td><td><span class="pill acc"><span class="d"></span>${esc(p.format)}</span></td><td class="right"><button class="btn sm primary" onclick="deployDelegated(${i})">Deploy →</button></td></tr>`).join('')}</tbody></table></div>${items.length>25?'<div class="muted" style="padding:8px 4px;font-size:12px">Showing first 25 of '+items.length+' — refine the filter.</div>':''}`;
-  }catch(e){w.innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>';}},300);}
-async function deployDelegated(i){const p=PKGS[i],uuid=document.getElementById('pkgDevice').value,msg=document.getElementById('pkgMsg');
-  if(!uuid)return showMsg(msg,'err','No device selected.');if(!p.hash||!p.uri)return showMsg(msg,'err','Package missing hash/uri.');const hw=p.hw[0];if(!hw)return showMsg(msg,'err','Package has no hardware id.');
-  showMsg(msg,'ok','Assigning '+p.filename.split('/').pop()+'…');
-  try{const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targets:{[hw]:{to:{target:p.filename,checksum:{method:'sha256',hash:p.hash},targetLength:p.len||0,uri:p.uri}}}})})).replace(/"/g,'');
+    showMsg(msg,'ok','✓ Source "'+dm.name+'" added and verified.');document.getElementById('srcJson').value='';await loadSources();renderSourcesModal();}catch(e){showMsg(msg,'err','Failed: '+e.message);}finally{btn.disabled=false;}}
+async function refreshSource(n){try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)+'/remote/refresh'),{method:'PUT'});toast('Refreshed');await loadSources();renderSourcesModal();}catch(e){toast('Refresh failed: '+e.message);}}
+async function removeSource(n){if(!(await uiConfirm({title:'Remove package source',message:'Remove "'+n+'"? Devices will no longer receive targets from this source.',ok:'Remove',danger:true})))return;try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)),{method:'DELETE'});toast('Removed');await loadSources();renderSourcesModal();}catch(e){toast('Remove failed: '+e.message);}}
+
+// ---------- upload (my package) ----------
+function openUpload(){
+  const ov=document.createElement('div');ov.className='modal open';ov.id='upModal';
+  ov.innerHTML=`<div class="m mini"><header><h3>Upload a package</h3></header>
+    <div class="mbody">
+      <label class="ml">Name</label><input class="mf" id="upName" placeholder="fleet-config" style="margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div><label class="ml">Version</label><input class="mf" id="upVer" placeholder="1.0.0"></div>
+        <div><label class="ml">Hardware id</label><input class="mf" id="upHw" placeholder="docker-compose"></div></div>
+      <label class="ml">File</label><input class="mf" type="file" id="upFile">
+      <div class="msg" id="upMsg" style="margin-top:10px"></div>
+    </div>
+    <footer><button class="btn mcancel" onclick="closeUpload()">Cancel</button><button class="btn primary" id="upBtn" onclick="doUpload()">Upload</button></footer></div>`;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)closeUpload();});
+  document.body.appendChild(ov);document.getElementById('upName').focus();
+}
+function closeUpload(){const m=document.getElementById('upModal');if(m)m.remove();}
+async function doUpload(){const name=document.getElementById('upName').value.trim(),ver=document.getElementById('upVer').value.trim(),hw=document.getElementById('upHw').value.trim(),file=document.getElementById('upFile').files[0],msg=document.getElementById('upMsg'),btn=document.getElementById('upBtn');
+  if(!name||!ver||!hw||!file)return showMsg(msg,'err','Fill name, version, hardware id and pick a file.');
+  const target=`${name}-${ver}`,q=`name=${encodeURIComponent(name)}&version=${encodeURIComponent(ver)}&hardwareIds=${encodeURIComponent(hw)}`;const fd=new FormData();fd.append('file',file);
+  btn.disabled=true;showMsg(msg,'ok','Uploading '+file.name+'…');
+  try{await api(rapi(`targets/${encodeURIComponent(target)}?${q}`),{method:'PUT',body:fd});await loadTargets();closeUpload();PKGSRC='mine';renderPackages();toast('✓ Uploaded '+target);}catch(e){showMsg(msg,'err','Upload failed: '+e.message);btn.disabled=false;}}
+
+// ---------- package detail ----------
+async function openPackage(i){const p=PKGVIEW[i];if(!p)return;PKGCUR=p;go('package');
+  const el=document.getElementById('pkgDetail');
+  el.innerHTML='<a class="back" onclick="go(\'packages\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Packages</a><div class="empty">Loading…</div>';
+  let compose=null;
+  if(p.source==='mine'&&isCompose(p)){try{const r=await fetch(rapi('targets/'+encodeURIComponent(p.key)));if(r.ok)compose=await r.text();}catch(e){}}
+  if(PKGCUR!==p)return;
+  renderPkgDetail(compose);
+}
+function renderPkgDetail(compose){const p=PKGCUR;if(!p)return;const kind=pkgKind(p);const mine=p.source==='mine';
+  const meta=mine?`<dt>Source</dt><dd>My package</dd><dt>Format</dt><dd>${pkgLabel(kind)} (${esc(p.format)})</dd><dt>Hardware id</dt><dd>${(p.hw||[]).map(h=>`<span class="tag">${esc(h)}</span>`).join(' ')||'—'}</dd><dt>Size</dt><dd>${p.length?bytes(p.length):'—'}</dd><dt>SHA-256</dt><dd class="mono" style="font-size:12px">${p.hash?esc(p.hash):'—'}</dd>`
+    :`<dt>Source</dt><dd>${esc(p.source)} <span class="muted">(delegated)</span></dd>${p.branch?`<dt>Branch / OS</dt><dd>${esc(p.branch)}</dd>`:''}${p.board?`<dt>Board</dt><dd><span class="tag">${esc(p.board)}</span></dd>`:''}${p.variant?`<dt>Variant</dt><dd>${esc(p.variant)}</dd>`:''}<dt>Version</dt><dd class="mono">${esc(p.version||'—')}</dd><dt>Format</dt><dd>${esc(p.format)}</dd><dt>OSTree/URI</dt><dd class="mono" style="font-size:12px">${p.uri?esc(p.uri):'—'}</dd>${p.createdAt?`<dt>Created</dt><dd>${fmtTime(p.createdAt)}</dd>`:''}`;
+  document.getElementById('pkgDetail').innerHTML=`
+    <a class="back" onclick="go('packages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Packages</a>
+    <div class="pdhdr"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${pkgIcon(p.format,(p.hw||[]).join(' '))}</svg></span>
+      <div><h1>${esc(p.name)}</h1><div class="sub"><span class="mono">${esc(p.version||'—')}</span> · <span class="badge ${kind}">${pkgLabel(kind)}</span> · <span class="src">${mine?'My package':esc(p.source)}</span></div></div>
+      <div class="dactions"><button class="btn primary" onclick="pkgDeploy()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Deploy to device</button>${mine?`<button class="btn dbad" onclick="deletePackage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13h10l1-13"/></svg> Delete</button>`:''}</div></div>
+    <div class="card"><header>${H('<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>')}<h2>Overview</h2></header><dl class="kv" style="padding:16px 18px;margin:0">${meta}</dl></div>
+    ${compose!=null?`<div class="card"><header>${H('<path d="M4 7h7v7H4zM13 7h7v4h-7zM13 13h7v4h-7z"/>')}<h2>Compose file</h2></header><pre class="code">${esc(compose)}</pre></div>`:''}
+    ${p.sbom?`<div class="card"><header>${H('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/>')}<h2>Software bill of materials</h2></header><div class="pad" style="padding:16px 18px"><a class="link" href="${esc(p.sbom)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">View SBOM (CycloneDX + VEX) ↗</a></div></div>`:''}
+    ${mine?`<div class="card"><header>${H('<path d="M4 6h16M4 12h16M4 18h10"/>')}<h2>Description</h2><span class="grow"></span><button class="btn sm ghost" onclick="editPkgDescription()">Edit</button></header><div class="pad" style="padding:16px 18px">${p.description?esc(p.description):'<span class="muted">No description yet. Descriptions are stored on your own package metadata (not available for delegated feeds).</span>'}</div></div>`:''}`;
+}
+async function pkgDeploy(){const p=PKGCUR;if(!p)return;
+  const hw=(p.hw||[])[0];if(!hw)return toast('Package has no hardware id.');
+  const target=p.source==='mine'?p.key:p.filename;
+  if(!p.hash)return toast('Package is missing its checksum.');
+  const opts=DEVICES.map(d=>{const dhw=hwOf(d.uuid);const compat=!dhw||dhw===hw;return {label:(d.deviceName||d.deviceId),sub:(dhw||'unknown hw')+(compat?' · compatible':' · hardware mismatch'),uuid:d.uuid};});
+  if(!opts.length)return toast('No devices provisioned.');
+  const idx=await uiPick({title:'Deploy “'+p.name+' '+(p.version||'')+'” to…',options:opts});
+  if(idx==null)return;const uuid=opts[idx].uuid;
+  const to={target:target,checksum:{method:'sha256',hash:p.hash},targetLength:p.length||0};if(p.uri)to.uri=p.uri;
+  try{const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targets:{[hw]:{to}}})})).replace(/"/g,'');
     const res=await api('/api/director/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correlationId:'urn:here-ota:mtu:'+mtu,mtuId:mtu,devices:[uuid]})});
-    showMsg(msg,res&&res.affected&&res.affected.length?'ok':'err',res&&res.affected&&res.affected.length?'✓ Assigned — device pulls from the source on next check-in.':'Device not affected (hw mismatch or already installed).');setTimeout(refreshAll,900);
-  }catch(e){showMsg(msg,'err','Failed: '+e.message);}}
+    toast(res&&res.affected&&res.affected.length?'✓ Assigned — installs on next check-in':'Device not affected (hw mismatch or already installed).');
+  }catch(e){toast('Deploy failed: '+e.message);}}
+async function deletePackage(){const p=PKGCUR;if(!p||p.source!=='mine')return;
+  if(!(await uiConfirm({title:'Delete package?',message:'Permanently delete “'+p.name+' '+(p.version||'')+'” from this cloud. This re-signs your targets metadata and cannot be undone.',ok:'Delete',danger:true})))return;
+  try{await api(rapi('targets/'+encodeURIComponent(p.key)),{method:'DELETE'});await loadTargets();toast('Package deleted');go('packages');}catch(e){toast('Delete failed: '+e.message);}}
+async function editPkgDescription(){const p=PKGCUR;if(!p||p.source!=='mine')return;
+  const v=await uiPrompt({title:'Edit description',label:'Description',value:p.description||'',multiline:true,ok:'Save'});if(v==null)return;
+  try{await api(rapi('proprietary-custom/'+encodeURIComponent(p.key)),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:v.trim()})});
+    p.description=v.trim();await loadTargets();renderPkgDetail(null);toast('Description saved');}catch(e){toast('Save failed: '+e.message);}}
 
 // ---------- provisioning ----------
 function openProvision(){document.getElementById('provModal').classList.add('open');renderProvCmd();}
