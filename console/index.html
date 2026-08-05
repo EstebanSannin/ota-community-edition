@@ -113,6 +113,7 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
 details.disc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:14px 18px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);font-weight:650} details.disc summary::-webkit-details-marker{display:none}
 details.disc .chev{transition:transform .15s} details.disc[open] .chev{transform:rotate(90deg)} details.disc summary .count{background:var(--surface-2);border-radius:20px;padding:1px 8px;font-size:11px;color:var(--text-dim)}
 .discbody{padding:0 18px 16px} .discbody input{margin-bottom:10px}
+details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-dim)}
 .modlist{display:flex;flex-wrap:wrap;gap:6px} .modchip{background:var(--surface-2);border-radius:6px;padding:2px 8px;font-size:11.5px;font-family:var(--mono);color:var(--text-dim)}
 .pkgtbl{width:100%;border-collapse:collapse;font-size:13px} .pkgtbl td{padding:6px 4px;border-bottom:1px solid var(--border)} .pkgtbl td.v{text-align:right;color:var(--text-dim);font-family:var(--mono)}
 .tl{position:relative;padding:4px 0 4px 20px;display:flex;flex-direction:column;gap:14px} .tl::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:2px;background:var(--border)}
@@ -284,6 +285,10 @@ function renderDevices(){
 let CUR=null;           // {uuid, device, ecus, sysinfo, packages, events}
 const H=svg=>`<svg class="hi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${svg}</svg>`;
 function flat(node,out){ if(!node||typeof node!=='object')return out; if(node.class)out.push(node); (node.children||[]).forEach(c=>flat(c,out)); return out; }
+function flatBlk(list,out){ (list||[]).forEach(b=>{ out.push(b); flatBlk(b.children,out); }); return out; }
+function mnts(b){ return (b.mountpoints||[]).filter(Boolean); }
+function mediaLabel(m){ return String(m).replace(/^.*\/media\//,'').replace(/^\//,'')||m; }
+function nicObj(s){ if(s&&typeof s==='object')return s; const p=String(s).split(/\s+/); return {name:(p[0]||'').replace(/@.*/,''),state:p[1]||''}; }
 function ecuRole(e){const hw=(e.hardwareId||'').toLowerCase();
   if(e.primary)return{label:'Operating system',ic:'<path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/>'};
   if(hw.includes('docker'))return{label:'Applications',ic:'<path d="M4 7h7v7H4zM13 7h7v4h-7zM13 13h7v4h-7z"/>'};
@@ -321,10 +326,14 @@ function renderDetail(){
   const pri=primaryOf(uuid)||{};
   const osname=o.os_name||'Torizon OS'; const osver=o.os_version||verOf(uuid)||'';
   const tags=Object.keys((d.attributes)||{});
-  const emmc=(o.block_devices||[]).find(b=>b.tran==='mmc'&&/mmcblk\d$/.test(b.name||''));
+  const blk=flatBlk(o.block_devices,[]);
+  // eMMC: the mmc-transport node that actually carries mounts (the partition, not the bare disk)
+  const emmc=blk.filter(b=>b.tran==='mmc'&&mnts(b).length).sort((a,b)=>mnts(b).length-mnts(a).length)[0]
+           || (o.block_devices||[]).find(b=>b.tran==='mmc'&&/mmcblk\d$/.test(b.name||''));
   const usbDevs=(o.usb||[]).filter(s=>!/root hub|Hub Controller|Hub$/i.test(s));
-  const usbAll=(o.block_devices||[]).filter(b=>b.tran==='usb');
-  const nics=o.interfaces||[];
+  const usbProduct=(o.usb||[]).map(s=>s.replace(/^Bus.*ID \S+ /,'').trim()).find(s=>s&&!/hub/i.test(s));
+  const usbAll=(o.block_devices||[]).filter(b=>b.tran==='usb'&&b.type==='disk');
+  const nics=(o.interfaces||[]).map(nicObj);
   const na='<span class="na">not reported yet</span>';
   const evClass=id=>/Completed|Applied|Complete|Success/i.test(id)?'ok':/Fail|Error|Denied/i.test(id)?'bad':'';
   const evs=events.slice().reverse().slice(0,12);
@@ -336,9 +345,10 @@ function renderDetail(){
         ${h&&e.primary?`<div class="hash mono">ostree ${esc(shortHash(h))}…</div>`:''}</div>
       <button class="btn ghost" onclick="deployPrompt('${esc(e.hardwareId)}')">Update</button></div>`;}).join('');
 
-  const netRows=nics.filter(s=>!/^lo /.test(s)&&!/^(docker|veth|br-|sit0)/.test(s)).map(s=>{const [nm,st]=s.split(' ');
-    const isUp=/UP/i.test(st);const kind=/wl|mlan/i.test(nm)?'Wi-Fi':/can/i.test(nm)?'CAN bus':'Ethernet';
-    return `<div class="hwrow ${isUp?'':'down'}"><span class="ic">${netIcon(kind)}</span><div class="g"><div class="t">${esc(kind)} — ${esc(nm)}</div></div><div class="v">${isUp?'up':'down'}</div></div>`;}).join('');
+  const netRows=nics.filter(n=>n.name&&!/^lo$/.test(n.name)&&!/^(docker|veth|br-|sit0|uap)/.test(n.name)).map(n=>{
+    const isUp=/UP/i.test(n.state||'');const kind=/wl|mlan/i.test(n.name)?'Wi-Fi':/can/i.test(n.name)?'CAN bus':'Ethernet';
+    const det=[n.mac?'MAC '+n.mac:'',n.ipv4||''].filter(Boolean).join(' · ');
+    return `<div class="hwrow ${isUp?'':'down'}"><span class="ic">${netIcon(kind)}</span><div class="g"><div class="t">${esc(kind)} — ${esc(n.name)} ${isUp?'<span class="tag">up</span>':''}</div>${det?`<div class="s mono">${esc(det)}</div>`:''}</div><div class="v">${isUp?'up':'down'}</div></div>`;}).join('');
 
   document.getElementById('devDetail').innerHTML=`
     <a class="back" onclick="go('devices')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Devices</a>
@@ -400,13 +410,16 @@ function renderDetail(){
       </div></div>
 
     <div class="card"><header>${H('<rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M6 12h.01M10 12h.01"/>')}<h2>Storage, network &amp; peripherals</h2></header>
-      ${emmc?`<div class="hwrow"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v8H8z"/></svg></span><div class="g"><div class="t">${/mmc/.test(emmc.tran)?'eMMC':'Disk'} — ${esc(emmc.name)}</div><div class="s">${esc((emmc.mountpoints||[]).filter(Boolean).join(', ')||'internal storage')}</div></div><div class="v">${esc(emmc.size||'')}</div></div>`:''}
+      ${emmc?`<div class="hwrow"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v8H8z"/></svg></span><div class="g"><div class="t">eMMC — ${esc(emmc.name)}</div><div class="s">${[emmc.fstype?esc(String(emmc.fstype).toUpperCase()):'',mnts(emmc).length?'mounted at '+esc(mnts(emmc).slice(0,6).join(', ')):'internal storage'].filter(Boolean).join(' · ')}</div></div><div class="v">${esc(emmc.size||'')}</div></div>`:''}
       ${netRows}
-      ${usbAll.map(b=>`<div class="hwrow"><span class="ic" style="background:var(--accent-weak);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v14"/><path d="M8 6l4-4 4 4"/><rect x="6" y="16" width="12" height="6" rx="2"/></svg></span><div class="g"><div class="t">USB storage — ${esc(b.name)} <span class="tag" style="background:var(--accent-weak);color:var(--accent)">attached</span></div><div class="s">${esc(b.model||'').trim()||'USB mass storage'}</div></div><div class="v">${esc(b.size||'')}</div></div>`).join('')}
+      ${usbAll.map(b=>{const kids=flatBlk(b.children,[]);const labels=kids.flatMap(mnts).map(mediaLabel);
+        const s=[esc((b.model||'').trim()),usbProduct?esc(usbProduct):'',labels.length?'mounted: '+esc(labels.join(', ')):''].filter(Boolean).join(' · ')||'USB mass storage';
+        return `<div class="hwrow"><span class="ic" style="background:var(--accent-weak);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v14"/><path d="M8 6l4-4 4 4"/><rect x="6" y="16" width="12" height="6" rx="2"/></svg></span><div class="g"><div class="t">USB storage — /dev/${esc(b.name)} <span class="tag" style="background:var(--accent-weak);color:var(--accent)">attached</span></div><div class="s">${s}</div></div><div class="v">${esc(b.size||'')}</div></div>`;}).join('')}
       <div class="hwrow"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v14"/><path d="M8 6l4-4 4 4"/><rect x="6" y="16" width="12" height="6" rx="2"/></svg></span><div class="g"><div class="t">USB devices</div><div class="s">${usbDevs.length?esc(usbDevs.map(s=>s.replace(/^Bus.*ID \S+ /,'')).join(' · ')):'root hubs only'}</div></div><div class="v muted" style="font-weight:500">${(o.usb||[]).length}</div></div>
-      ${o.kernel?'<div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Peripherals refresh via the on-device reporter (USB hot-plug + timer).</span></div>':''}</div>
+      ${o.kernel?'<div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Peripherals refresh via the on-device reporter (USB hot-plug + timer).</span></div>':''}
+      ${nodes.length?`<details class="disc" style="border-top:1px solid var(--border)"><summary><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="12" height="12"><path d="M9 6l6 6-6 6"/></svg>Full hardware tree <span class="sub">everything lshw detected</span></summary><div class="discbody"><table class="pkgtbl">${nodes.map(n=>`<tr><td>${esc(n.product||n.description||n.id||n.class)}</td><td class="v">${esc(n.class)}</td></tr>`).join('')}</table></div></details>`:''}</div>
 
-    <details class="card disc"><summary>${H('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>')}Installed packages <span class="count">${packages.length}</span><span class="grow"></span></summary>
+    <details class="card disc"><summary><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="12" height="12"><path d="M9 6l6 6-6 6"/></svg>${H('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>')}Installed packages <span class="count">${packages.length}</span><span class="sub">advanced — the OS image package manifest</span></summary>
       <div class="discbody"><input id="dd-pkgfilter" placeholder="filter packages…" oninput="renderPkgs()"><table class="pkgtbl" id="dd-pkgtbl"></table></div></details>
 
     <div class="card"><header>${H('<path d="M3 3v6h6"/><path d="M3 9a9 9 0 1 0 3-6"/><path d="M12 8v4l3 2"/>')}<h2>Update history</h2><span class="count">${evs.length}</span></header>

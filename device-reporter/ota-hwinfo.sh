@@ -20,8 +20,9 @@ modules=$(lsmod 2>/dev/null | awk 'NR>1{print $1}' | paste -sd, -)
 os_name=""; os_version=""; os_variant=""; os_id=""
 if [ -r /etc/os-release ]; then . /etc/os-release; os_name=${NAME:-}; os_version=${VERSION:-}; os_variant=${VARIANT:-}; os_id=${ID:-}; fi
 usb=$(lsusb 2>/dev/null | jq -R . | jq -s . 2>/dev/null || echo '[]')
-block=$(lsblk -J -o NAME,SIZE,TYPE,MODEL,TRAN,MOUNTPOINTS 2>/dev/null || echo '{"blockdevices":[]}')
-nics=$(ip -br link 2>/dev/null | awk '{print $1" "$2}' | jq -R . | jq -s . 2>/dev/null || echo '[]')
+block=$(lsblk -J -o NAME,SIZE,TYPE,FSTYPE,MODEL,TRAN,MOUNTPOINTS 2>/dev/null || echo '{"blockdevices":[]}')
+# interfaces as objects {name,state,mac,ipv4} — ip -j gives structured output on modern iproute2
+nics=$(ip -j addr show 2>/dev/null | jq -c '[.[] | {name:.ifname, state:.operstate, mac:(.address//null), ipv4:([.addr_info[]?|select(.family=="inet")|.local]|first//null)}]' 2>/dev/null || echo '[]')
 [ -n "$usb" ]   || usb='[]'
 [ -n "$block" ] || block='{"blockdevices":[]}'
 [ -n "$nics" ]  || nics='[]'
