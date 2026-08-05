@@ -86,6 +86,15 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
 .modal{position:fixed;inset:0;display:none;place-items:start center;padding:70px 16px;background:rgba(8,14,22,.55);z-index:50} .modal.open{display:grid}
 .modal .m{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);width:min(720px,100%);overflow:hidden}
 .modal .m header{display:flex;align-items:center;padding:17px 20px;border-bottom:1px solid var(--border)} .modal .m header h3{margin:0;font-size:16px;font-weight:680}
+.modal .m.mini{width:min(440px,100%)}
+.modal .m .mbody{padding:20px}
+.modal .m .mbody .ml{display:block;font-size:12px;color:var(--text-dim);margin-bottom:7px;font-weight:600}
+.modal .m .mbody .mf{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box} .modal .m .mbody .mf:focus{outline:none;border-color:var(--accent)} .modal .m .mbody textarea.mf{resize:vertical;min-height:64px}
+.modal .m .mbody .mmsg{margin:0;color:var(--text);line-height:1.55;font-size:14px}
+.modal .m footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface-2)}
+.modal .m .btn.dbad{background:var(--bad);border-color:var(--bad);color:#fff}
+.modal .m .picklist{padding:14px 14px 6px;max-height:56vh;overflow:auto}
+.pickrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:11px 13px;border:1px solid var(--border);border-radius:9px;background:var(--surface);cursor:pointer;margin-bottom:9px;font-family:inherit} .pickrow:hover{border-color:var(--accent);background:var(--accent-weak)} .pickrow .pk-t{font-weight:620;font-size:14px;color:var(--text)} .pickrow .pk-s{font-size:12px;color:var(--text-dim);font-family:var(--mono)}
 .cmd{font-family:var(--mono);font-size:12.5px;background:#0a1119;color:#d6e2f0;border-color:#1d2a3a;white-space:pre-wrap;word-break:break-all}
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-weight:600;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:60} .toast.show{opacity:1;transform:translate(-50%,0)}
 /* ---- device detail ---- */
@@ -435,9 +444,49 @@ function renderPkgs(){const el=document.getElementById('dd-pkgtbl');if(!el)retur
 async function patchDevice(body,okmsg){try{await api(dapi('devices/'+CUR.uuid),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const i=DEVICES.findIndex(x=>x.uuid===CUR.uuid);if(i>=0)Object.assign(DEVICES[i],body);Object.assign(CUR.device,body);renderDetail();renderDevices();toast(okmsg);}
   catch(e){toast('Failed: '+e.message);}}
-function renameDevice(){const n=prompt('Device name:',CUR.device.deviceName||'');if(n==null)return;const v=n.trim();if(!v||v===CUR.device.deviceName)return;patchDevice({deviceName:v},'Renamed');}
-function editNotes(){const n=prompt('Description:',CUR.device.notes||'');if(n==null)return;patchDevice({notes:n.trim()},'Description saved');}
-async function addTag(){const t=(prompt('Add a tag (keyword):','')||'').trim();if(!t)return;
+// ---------- styled in-app dialogs (replace native prompt/confirm) ----------
+function uiPrompt(o){o=o||{};return new Promise(resolve=>{
+  const ov=document.createElement('div');ov.className='modal open';const multi=!!o.multiline;
+  ov.innerHTML=`<div class="m mini"><header><h3></h3></header>
+    <div class="mbody">${o.label?'<span class="ml"></span>':''}${multi?'<textarea class="mf" rows="3"></textarea>':'<input class="mf" type="text">'}</div>
+    <footer><button class="btn mcancel">Cancel</button><button class="btn primary mok"></button></footer></div>`;
+  ov.querySelector('h3').textContent=o.title||'';if(o.label)ov.querySelector('.ml').textContent=o.label;
+  ov.querySelector('.mok').textContent=o.ok||'OK';
+  const f=ov.querySelector('.mf');f.value=o.value||'';if(o.placeholder)f.placeholder=o.placeholder;
+  function close(v){document.removeEventListener('keydown',onKey);ov.remove();resolve(v);}
+  function onKey(e){if(e.key==='Escape')close(null);else if(e.key==='Enter'&&!multi){e.preventDefault();close(f.value);}}
+  ov.querySelector('.mcancel').onclick=()=>close(null);ov.querySelector('.mok').onclick=()=>close(f.value);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close(null);});document.addEventListener('keydown',onKey);
+  document.body.appendChild(ov);f.focus();if(f.select)f.select();});}
+function uiConfirm(o){o=o||{};return new Promise(resolve=>{
+  const ov=document.createElement('div');ov.className='modal open';
+  ov.innerHTML=`<div class="m mini"><header><h3></h3></header>
+    <div class="mbody"><p class="mmsg"></p></div>
+    <footer><button class="btn mcancel">Cancel</button><button class="btn mok"></button></footer></div>`;
+  ov.querySelector('h3').textContent=o.title||'Confirm';ov.querySelector('.mmsg').textContent=o.message||'';
+  const ok=ov.querySelector('.mok');ok.textContent=o.ok||'OK';ok.classList.add(o.danger?'dbad':'primary');
+  function close(v){document.removeEventListener('keydown',onKey);ov.remove();resolve(v);}
+  function onKey(e){if(e.key==='Escape')close(false);else if(e.key==='Enter')close(true);}
+  ov.querySelector('.mcancel').onclick=()=>close(false);ok.onclick=()=>close(true);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close(false);});document.addEventListener('keydown',onKey);
+  document.body.appendChild(ov);ok.focus();});}
+function uiPick(o){o=o||{};return new Promise(resolve=>{
+  const ov=document.createElement('div');ov.className='modal open';
+  ov.innerHTML=`<div class="m"><header><h3></h3></header><div class="mbody picklist"></div><footer><button class="btn mcancel">Cancel</button></footer></div>`;
+  ov.querySelector('h3').textContent=o.title||'Choose';const list=ov.querySelector('.picklist');
+  (o.options||[]).forEach((op,i)=>{const b=document.createElement('button');b.className='pickrow';
+    const t=document.createElement('span');t.className='pk-t';t.textContent=op.label;b.appendChild(t);
+    if(op.sub){const s=document.createElement('span');s.className='pk-s';s.textContent=op.sub;b.appendChild(s);}
+    b.onclick=()=>close(i);list.appendChild(b);});
+  function close(v){document.removeEventListener('keydown',onKey);ov.remove();resolve(v);}
+  function onKey(e){if(e.key==='Escape')close(null);}
+  ov.querySelector('.mcancel').onclick=()=>close(null);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close(null);});document.addEventListener('keydown',onKey);
+  document.body.appendChild(ov);});}
+
+async function renameDevice(){const n=await uiPrompt({title:'Rename device',label:'Device name',value:CUR.device.deviceName||'',placeholder:'my-device-01'});if(n==null)return;const v=n.trim();if(!v||v===CUR.device.deviceName)return;patchDevice({deviceName:v},'Renamed');}
+async function editNotes(){const n=await uiPrompt({title:'Edit description',label:'Description',value:CUR.device.notes||'',placeholder:'What is this device for?',multiline:true,ok:'Save'});if(n==null)return;patchDevice({notes:n.trim()},'Description saved');}
+async function addTag(){const t=((await uiPrompt({title:'Add tag',label:'Tag (keyword)',placeholder:'e.g. production'}))||'').trim();if(!t)return;
   try{await api(dapi('devices/'+CUR.uuid+'/device_tags'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({tagId:t,tagValue:'true'})});
     CUR.device.attributes=Object.assign({},CUR.device.attributes,{[t]:'true'});renderDetail();toast('Tag added');}
   catch(e){toast('Tags need a tag definition first — noted, wiring later. ('+e.message.slice(0,40)+')');}}
@@ -451,9 +500,8 @@ async function deployPrompt(hwid){
   try{const di=await api(rapi('delegations_items?nameContains='+encodeURIComponent(hwid||'')));(di.values||di||[]).forEach(it=>{const c=(it.clientTargetItem&&it.clientTargetItem.custom)||{},h=(it.clientTargetItem&&it.clientTargetItem.hashes)||{};
     if(!hwid||(c.hardwareIds||[]).includes(hwid))cands.push({label:it.targetFilename.split('/').pop()+' (source)',target:it.targetFilename,hash:h.sha256,len:(it.clientTargetItem&&it.clientTargetItem.length)||0,uri:c.uri,hw:(c.hardwareIds||[])[0]});});}catch(e){}
   if(!cands.length)return toast('No targets available for '+(hwid||'this device'));
-  const menu=cands.map((c,i)=>`${i+1}. ${c.label}`).join('\n');
-  const pick=prompt('Deploy to '+(hwid||'device')+' — choose a target:\n\n'+menu+'\n\nEnter number:','1');
-  const idx=parseInt(pick)-1; if(isNaN(idx)||!cands[idx])return;
+  const idx=await uiPick({title:'Deploy to '+(hwid||'device'),options:cands.map(c=>({label:c.label,sub:c.target}))});
+  if(idx==null||!cands[idx])return;
   const c=cands[idx]; const to={target:c.target,checksum:{method:'sha256',hash:c.hash},targetLength:c.len||0}; if(c.uri)to.uri=c.uri;
   try{const mtu=(await api('/api/director/multi_target_updates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targets:{[c.hw||hwid]:{to}}})})).replace(/"/g,'');
     const res=await api('/api/director/assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({correlationId:'urn:here-ota:mtu:'+mtu,mtuId:mtu,devices:[CUR.uuid]})});
@@ -487,7 +535,7 @@ async function addSource(){const msg=document.getElementById('srcMsg'),btn=docum
   try{await api(rapi('trusted-delegations/keys'),{method:'PUT',headers:HH,body:JSON.stringify(keys)});await api(rapi('trusted-delegations'),{method:'PUT',headers:HH,body:JSON.stringify([dm])});await api(rapi('trusted-delegations/'+encodeURIComponent(dm.name)+'/remote'),{method:'PUT',headers:HH,body:JSON.stringify({uri:fu.uri,friendlyName:cfg.friendlyName||dm.name})});
     showMsg(msg,'ok','✓ Source "'+dm.name+'" added and verified.');document.getElementById('srcJson').value='';await loadSources();}catch(e){showMsg(msg,'err','Failed: '+e.message);}finally{btn.disabled=false;}}
 async function refreshSource(n){try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)+'/remote/refresh'),{method:'PUT'});toast('Refreshed');await loadSources();}catch(e){toast('Refresh failed: '+e.message);}}
-async function removeSource(n){if(!confirm('Remove package source "'+n+'"?'))return;try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)),{method:'DELETE'});toast('Removed');await loadSources();}catch(e){toast('Remove failed: '+e.message);}}
+async function removeSource(n){if(!(await uiConfirm({title:'Remove package source',message:'Remove "'+n+'"? Devices will no longer receive targets from this source.',ok:'Remove',danger:true})))return;try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)),{method:'DELETE'});toast('Removed');await loadSources();}catch(e){toast('Remove failed: '+e.message);}}
 function fillPkgDevice(){const el=document.getElementById('pkgDevice');if(el)el.innerHTML=DEVICES.map(d=>`<option value="${esc(d.uuid)}">${esc(d.deviceName||d.deviceId)}</option>`).join('')||'<option value="">no devices</option>';}
 let pkgTimer;function browsePackages(){clearTimeout(pkgTimer);pkgTimer=setTimeout(async()=>{const q=document.getElementById('pkgSearch').value.trim(),w=document.getElementById('pkgWrap');
   try{const di=await api(rapi('delegations_items'+(q?('?nameContains='+encodeURIComponent(q)):'')));const items=(di.values||di||[]);document.getElementById('pkg-count').textContent=items.length;
