@@ -26,6 +26,21 @@ usb=$(lsusb 2>/dev/null | jq -R . | jq -s . 2>/dev/null); [ -n "$usb" ] || usb='
 block=$(lsblk -J -o NAME,SIZE,TYPE,FSTYPE,MODEL,TRAN,MOUNTPOINTS 2>/dev/null); [ -n "$block" ] || block='{"blockdevices":[]}'
 # interfaces as objects {name,state,mac,ipv4} — ip -j gives structured output on modern iproute2
 nics=$(ip -j addr show 2>/dev/null | jq -c '[.[] | {name:.ifname, state:.operstate, mac:(.address//null), ipv4:([.addr_info[]?|select(.family=="inet")|.local]|first//null)}]' 2>/dev/null); [ -n "$nics" ] || nics='[]'
+# eMMC wear/health from sysfs (JEDEC eMMC 5.0: pre_eol_info + device life-time estimates).
+# Only the whole-device nodes (mmcblkN) expose it — skip partitions / boot / rpmb. Raw hex
+# values; the console decodes them. Empty on non-eMMC boards (e.g. virtio on QEMU).
+storage_health=$(for d in /sys/class/block/mmcblk*; do
+    n=${d##*/}
+    [ -r "$d/device/life_time" ] || continue     # partitions/boot share device/, filtered next
+    [ "$n" = "${n%%p[0-9]*}" ] || continue        # skip partitions (mmcblkNpM)
+    [ "$n" = "${n%%boot*}" ]   || continue        # skip boot areas (mmcblkNbootM)
+    [ "$n" = "${n%%rpmb*}" ]   || continue        # skip rpmb
+    jq -n --arg dev "$n" \
+      --arg life_time "$(cat "$d/device/life_time" 2>/dev/null)" \
+      --arg pre_eol "$(cat "$d/device/pre_eol_info" 2>/dev/null)" \
+      --arg model "$(cat "$d/device/name" 2>/dev/null)" \
+      '{dev:$dev, life_time:$life_time, pre_eol:$pre_eol, model:$model}'
+  done | jq -s . 2>/dev/null); [ -n "$storage_health" ] || storage_health='[]'
 
 # --- assemble: the lshw tree + a clean top-level ota_report object ---
 printf '%s' "$lshw_json" | jq \
@@ -34,12 +49,14 @@ printf '%s' "$lshw_json" | jq \
   --arg modules "$modules" --arg os_name "$os_name" --arg os_version "$os_version" \
   --arg os_variant "$os_variant" --arg os_id "$os_id" \
   --argjson usb "$usb" --argjson block "$block" --argjson nics "$nics" \
+  --argjson storage_health "$storage_health" \
   '(if type=="array" then (.[0] // {}) else . end) + {ota_report: {
       kernel:$kernel, arch:$arch, kernel_build:$kbuild, kernel_cmdline:$cmdline,
       cpu_governor:$governor, device_tree:$device_tree, last_boot:$last_boot,
       os_name:$os_name, os_version:$os_version, os_variant:$os_variant, os_id:$os_id,
       modules:(if $modules=="" then [] else ($modules|split(",")) end),
-      usb:$usb, block_devices:($block.blockdevices // []), interfaces:$nics
+      usb:$usb, block_devices:($block.blockdevices // []), interfaces:$nics,
+      storage_health:$storage_health
   }}' >"$TMP" || { echo "ota-hwinfo: jq assembly failed" >&2; exit 1; }
 
 # --- publish only when the meaningful report changed (avoids needless aktualizr restarts) ---

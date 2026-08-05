@@ -76,6 +76,8 @@ tr.click{cursor:pointer} tr.click:hover{background:var(--surface-2)}
 .pill.idle{background:var(--idle-bg);color:var(--idle)} .pill.idle .d{background:var(--idle)}
 .pill.acc{background:var(--accent-weak);color:var(--accent)} .pill.acc .d{background:var(--accent)}
 .tag{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--text-dim);font-size:11.5px;font-family:var(--mono)} .tag.role{background:var(--accent-weak);color:var(--accent);font-family:var(--sans);font-weight:600}
+.health{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap} .health .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+.health.ok{background:var(--ok-bg);color:var(--ok)} .health.warn{background:var(--warn-bg);color:var(--warn)} .health.bad{background:var(--bad-bg);color:var(--bad)}
 .form{padding:18px;display:flex;flex-direction:column;gap:14px}
 label .l,.lbl2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);font-weight:650;display:block;margin-bottom:6px}
 select,input,textarea{width:100%;font:inherit;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
@@ -361,6 +363,19 @@ function flatBlk(list,out){ (list||[]).forEach(b=>{ out.push(b); flatBlk(b.child
 function mnts(b){ return (b.mountpoints||[]).filter(Boolean); }
 function mediaLabel(m){ return String(m).replace(/^.*\/media\//,'').replace(/^\//,'')||m; }
 function nicObj(s){ if(s&&typeof s==='object')return s; const p=String(s).split(/\s+/); return {name:(p[0]||'').replace(/@.*/,''),state:p[1]||''}; }
+// eMMC health (JEDEC eMMC 5.0): decode raw sysfs hex into a labelled, severity-coloured chip
+function emmcLife(lt){const codes=String(lt||'').trim().split(/\s+/).map(x=>parseInt(x,16)).filter(n=>!isNaN(n)&&n>0);
+  if(!codes.length)return null;const c=Math.max(...codes);
+  if(c>=0x0b)return{label:'life exceeded',sev:'bad'};
+  return{label:((c-1)*10)+'–'+(c*10)+'% life used',sev:c>=9?'bad':c>=7?'warn':'ok'};}
+function emmcEol(eol){const c=parseInt(String(eol||'').trim(),16);
+  if(c===3)return{label:'Urgent',sev:'bad'};if(c===2)return{label:'Warning',sev:'warn'};if(c===1)return{label:'Normal',sev:'ok'};return null;}
+function emmcHealth(name){const sh=((CUR&&CUR.sys||{}).ota_report||{}).storage_health||[];
+  const h=sh.find(x=>name&&String(name).startsWith(x.dev))||sh[0];if(!h)return null;
+  const parts=[emmcLife(h.life_time),emmcEol(h.pre_eol)].filter(Boolean);if(!parts.length)return null;
+  const sev=parts.some(p=>p.sev==='bad')?'bad':parts.some(p=>p.sev==='warn')?'warn':'ok';
+  return{text:parts.map(p=>p.label).join(' · '),sev,model:h.model||''};}
+function healthChip(h){return h?`<span class="health ${h.sev}"><span class="d"></span>${esc(h.text)}</span>`:'';}
 function ecuRole(e){const hw=(e.hardwareId||'').toLowerCase();
   if(e.primary)return{label:'Operating system',ic:'<path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/>'};
   if(hw.includes('docker'))return{label:'Applications',ic:'<path d="M4 7h7v7H4zM13 7h7v4h-7zM13 13h7v4h-7z"/>'};
@@ -401,6 +416,7 @@ function renderDetail(){
   // eMMC: the mmc-transport node that actually carries mounts (the partition, not the bare disk)
   const emmc=blk.filter(b=>b.tran==='mmc'&&mnts(b).length).sort((a,b)=>mnts(b).length-mnts(a).length)[0]
            || (o.block_devices||[]).find(b=>b.tran==='mmc'&&/mmcblk\d$/.test(b.name||''));
+  const eh=emmcHealth(emmc&&emmc.name);   // eMMC wear/health chip (null if not an eMMC device)
   const usbDevs=(o.usb||[]).filter(s=>!/root hub|Hub Controller|Hub$/i.test(s));
   const usbProduct=(o.usb||[]).map(s=>s.replace(/^Bus.*ID \S+ /,'').trim()).find(s=>s&&!/hub/i.test(s));
   const usbAll=(o.block_devices||[]).filter(b=>b.tran==='usb'&&b.type==='disk');
@@ -466,6 +482,7 @@ function renderDetail(){
           <dt>Memory</dt><dd>${mem||na}</dd>
           <dt>CPU governor</dt><dd>${o.cpu_governor?esc(o.cpu_governor):na}</dd>
           <dt>Last boot</dt><dd>${o.last_boot?relTime(o.last_boot):na}</dd>
+          ${eh?`<dt>eMMC health</dt><dd>${healthChip(eh)}${eh.model?' <span class="muted" style="font-size:12px">'+esc(eh.model.trim())+'</span>':''}</dd>`:''}
         </dl></div></div>
     </div>
 
@@ -481,7 +498,7 @@ function renderDetail(){
       </div></div>
 
     <div class="card"><header>${H('<rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M6 12h.01M10 12h.01"/>')}<h2>Storage, network &amp; peripherals</h2></header>
-      ${emmc?`<div class="hwrow"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v8H8z"/></svg></span><div class="g"><div class="t">eMMC — ${esc(emmc.name)}</div><div class="s">${[emmc.fstype?esc(String(emmc.fstype).toUpperCase()):'',mnts(emmc).length?'mounted at '+esc(mnts(emmc).slice(0,6).join(', ')):'internal storage'].filter(Boolean).join(' · ')}</div></div><div class="v">${esc(emmc.size||'')}</div></div>`:''}
+      ${emmc?`<div class="hwrow"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8v8H8z"/></svg></span><div class="g"><div class="t">eMMC — ${esc(emmc.name)} ${healthChip(eh)}</div><div class="s">${[emmc.fstype?esc(String(emmc.fstype).toUpperCase()):'',mnts(emmc).length?'mounted at '+esc(mnts(emmc).slice(0,6).join(', ')):'internal storage'].filter(Boolean).join(' · ')}</div></div><div class="v">${esc(emmc.size||'')}</div></div>`:''}
       ${netRows}
       ${usbAll.map(b=>{const kids=flatBlk(b.children,[]);const labels=kids.flatMap(mnts).map(mediaLabel);
         const s=[esc((b.model||'').trim()),usbProduct?esc(usbProduct):'',labels.length?'mounted: '+esc(labels.join(', ')):''].filter(Boolean).join(' · ')||'USB mass storage';
