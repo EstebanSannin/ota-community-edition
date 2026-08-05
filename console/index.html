@@ -222,8 +222,8 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
         <div class="card"><header><h2>Package sources</h2><span class="count" id="src-count">0</span></header>
           <div id="srcWrap"><div class="empty">Loading…</div></div>
           <div class="form" style="border-top:1px solid var(--border)">
-            <div><label><span class="l">Add a source — paste the delegation config JSON</span>
-              <textarea id="srcJson" rows="3" placeholder='{"keys":[…],"delegationMetadata":{"name":"…","paths":["*/nightly-*"],"threshold":1},"fetchUrl":{"uri":"https://…"}}'></textarea></label></div>
+            <div><label><span class="l">Add a source — paste the delegation config JSON, or a URL to it</span>
+              <textarea id="srcJson" rows="3" placeholder='https://…/delegations/add-tdx-quarterly.json    — or paste the JSON: {"keys":[…],"delegationMetadata":{"name":"…","paths":["*/release-*"],"threshold":1},"fetchUrl":{"uri":"https://…"}}'></textarea></label></div>
             <button class="btn primary" id="srcBtn" onclick="addSource()" style="align-self:start">Add package source →</button>
             <div class="msg" id="srcMsg"></div>
           </div>
@@ -620,10 +620,30 @@ async function loadSources(){let roles=[];try{roles=await api(rapi('trusted-dele
   const tot=Object.values(counts).reduce((a,b)=>a+b,0);document.getElementById('t-src-m').textContent=tot+' packages available';
   document.getElementById('srcWrap').innerHTML=roles.length?roles.map((r,i)=>{const info=infos[i]||{},n=counts[r.name]||0;
     return `<div class="srcrow"><span class="pill acc"><span class="d"></span>verified</span><div class="grow"><div class="nm">${esc(info.friendlyName||r.name)}</div><div class="muted mono" style="font-size:12px">${esc(r.name)} · paths ${esc((r.paths||[]).join(', '))} · ${info.lastFetched?('fetched '+relTime(info.lastFetched)):'not fetched'}</div></div><span class="tag">${n} packages</span><button class="btn sm" onclick="refreshSource('${esc(r.name)}')">Refresh</button><button class="btn sm danger" onclick="removeSource('${esc(r.name)}')">Remove</button></div>`;}).join(''):'<div class="empty">No external package sources yet.</div>';}
-async function addSource(){const msg=document.getElementById('srcMsg'),btn=document.getElementById('srcBtn');let cfg;try{cfg=JSON.parse(document.getElementById('srcJson').value);}catch(e){return showMsg(msg,'err','Invalid JSON.');}
-  const dm=cfg.delegationMetadata,keys=cfg.keys,fu=cfg.fetchUrl;if(!dm||!keys||!fu||!dm.name)return showMsg(msg,'err','JSON needs keys, delegationMetadata (with name), and fetchUrl.');
+async function addSource(){const msg=document.getElementById('srcMsg'),btn=document.getElementById('srcBtn');
+  const raw=(document.getElementById('srcJson').value||'').trim();
+  if(!raw)return showMsg(msg,'err','Paste a delegation URL or its JSON.');
+  const isUrl=/^https?:\/\//i.test(raw);
+  let cfg;
+  try{
+    if(isUrl){showMsg(msg,'ok','Fetching '+raw+' …');const r=await fetch(raw);if(!r.ok)throw new Error('HTTP '+r.status);cfg=await r.json();}
+    else cfg=JSON.parse(raw);
+  }catch(e){return showMsg(msg,'err',isUrl?('Could not fetch/parse that URL: '+e.message):'Invalid JSON — paste the delegation contents, or its URL.');}
+  const dm=cfg.delegationMetadata,newKeys=cfg.keys,fu=cfg.fetchUrl;if(!dm||!newKeys||!fu||!dm.name)return showMsg(msg,'err','That config is missing keys, delegationMetadata (with name), or fetchUrl.');
+  const uri=(fu&&fu.uri)||fu;
   btn.disabled=true;showMsg(msg,'ok','Registering + verifying…');const HH={'Content-Type':'application/json'};
-  try{await api(rapi('trusted-delegations/keys'),{method:'PUT',headers:HH,body:JSON.stringify(keys)});await api(rapi('trusted-delegations'),{method:'PUT',headers:HH,body:JSON.stringify([dm])});await api(rapi('trusted-delegations/'+encodeURIComponent(dm.name)+'/remote'),{method:'PUT',headers:HH,body:JSON.stringify({uri:fu.uri,friendlyName:cfg.friendlyName||dm.name})});
+  try{
+    // The keys and roles endpoints REPLACE the whole collection — so merge with what's already
+    // registered, otherwise adding a source would silently delete the existing ones.
+    const existRoles=(await api(rapi('trusted-delegations')).catch(()=>[]))||[];
+    const existKeys=(await api(rapi('trusted-delegations/keys')).catch(()=>[]))||[];
+    const sig=k=>(k&&k.keyval&&k.keyval.public)||JSON.stringify(k);
+    const seen=new Set(existKeys.map(sig));const mergedKeys=existKeys.slice();
+    (newKeys||[]).forEach(k=>{const s=sig(k);if(!seen.has(s)){seen.add(s);mergedKeys.push(k);}});
+    const mergedRoles=existRoles.filter(r=>r.name!==dm.name).concat([dm]);
+    await api(rapi('trusted-delegations/keys'),{method:'PUT',headers:HH,body:JSON.stringify(mergedKeys)});
+    await api(rapi('trusted-delegations'),{method:'PUT',headers:HH,body:JSON.stringify(mergedRoles)});
+    await api(rapi('trusted-delegations/'+encodeURIComponent(dm.name)+'/remote'),{method:'PUT',headers:HH,body:JSON.stringify({uri:uri,friendlyName:cfg.friendlyName||dm.name})});
     showMsg(msg,'ok','✓ Source "'+dm.name+'" added and verified.');document.getElementById('srcJson').value='';await loadSources();}catch(e){showMsg(msg,'err','Failed: '+e.message);}finally{btn.disabled=false;}}
 async function refreshSource(n){try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)+'/remote/refresh'),{method:'PUT'});toast('Refreshed');await loadSources();}catch(e){toast('Refresh failed: '+e.message);}}
 async function removeSource(n){if(!(await uiConfirm({title:'Remove package source',message:'Remove "'+n+'"? Devices will no longer receive targets from this source.',ok:'Remove',danger:true})))return;try{await api(rapi('trusted-delegations/'+encodeURIComponent(n)),{method:'DELETE'});toast('Removed');await loadSources();}catch(e){toast('Remove failed: '+e.message);}}
