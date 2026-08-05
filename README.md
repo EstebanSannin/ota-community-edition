@@ -14,7 +14,19 @@ by third parties.
 
 ## Quickstart
 
-**Requirements:** Docker with the `docker compose` plugin.
+**Requirements:** Docker with the `docker compose` plugin. On a fresh Debian/Ubuntu host:
+
+```bash
+curl -fsSL https://get.docker.com | sudo sh          # installs Docker + the compose plugin
+sudo usermod -aG docker "$USER" && newgrp docker     # run docker without sudo (or re-login)
+```
+
+Then clone this branch and bring it up:
+
+```bash
+git clone -b greenfield-boot-fixes https://github.com/EstebanSannin/ota-community-edition.git
+cd ota-community-edition
+```
 
 **Fastest — pull prebuilt multi-arch images** (`amd64`/`arm64`, no JDK/sbt):
 
