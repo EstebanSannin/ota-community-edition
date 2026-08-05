@@ -322,7 +322,7 @@ function renderDetail(){
   const cpuModel=procs.map(n=>n.product).find(p=>p && !/^cpu$/i.test(p)) || (cores?cores+'× core'+(cores>1?'s':''):'—');
   const memNode=nodes.find(n=>n.class==='memory' && /system memory/i.test(n.description||'')) || nodes.find(n=>n.class==='memory'&&n.size>1e8);
   const mem=memNode?bytes(memNode.size):null;
-  const serial=(o.usb&&'') || (sys.serial) || ((nodes.find(n=>n.class==='system')||{}).serial) || (device.deviceId||'').split('-').pop();
+  const serial=(sys.serial) || ((nodes.find(n=>n.class==='system')||{}).serial) || (d.deviceId||'').split('-').pop();
   const pri=primaryOf(uuid)||{};
   const osname=o.os_name||'Torizon OS'; const osver=o.os_version||verOf(uuid)||'';
   const tags=Object.keys((d.attributes)||{});
