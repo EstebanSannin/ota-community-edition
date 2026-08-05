@@ -178,6 +178,18 @@ partial (fleets ≈ device groups, lockboxes, metrics), ~6 absent (remote-access
 opt-in thin **adapter service** built in phases, kept **secondary**. See
 [torizon-api-compat.md](torizon-api-compat.md).
 
+## Gateway fix: device hardware inventory (`system_info`)
+
+`system_info` came back empty and it turned out to be **our** bug, not the device. aktualizr
+gathers hardware info with `lshw -json` and `PUT`s it to exactly **`/system_info`** (no trailing
+slash), but `gateway.conf` only had `location /system_info/` (*with* slash), so nginx
+301-redirected the bare path and the report was dropped. (`/system_info/network` worked because
+it matches the slashed prefix — hence network populated, hardware empty.) Fixed by adding an
+exact-match `location = /system_info` route (same fix class as `/events` earlier). Verified with
+an mTLS `PUT` via a device cert: `200`, and the JSON is stored. Real Torizon devices repopulate
+it on the next check-in automatically (a failed PUT never cached aktualizr's "sent-once" hash).
+This unlocks a **Hardware** panel in the UI (memory / disks / CPU / attached devices).
+
 ## Current status
 
 | Capability | Status |
