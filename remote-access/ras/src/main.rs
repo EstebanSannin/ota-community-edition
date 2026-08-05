@@ -348,6 +348,11 @@ async fn run_bastion(state: Arc<AppState>, host_key: ssh_key::PrivateKey) -> Res
     let keypair = russh_keys::decode_openssh(&host_key.to_bytes()?, None)?;
     let mut config = russh::server::Config::default();
     config.keys.push(keypair);
+    // Keep the mostly-idle device control connection alive; without this the reverse tunnel was
+    // dropping (~10s) with "early eof" and reconnecting, killing interactive sessions.
+    config.keepalive_interval = Some(std::time::Duration::from_secs(5));
+    config.keepalive_max = 10;
+    config.inactivity_timeout = None;
     let config = Arc::new(config);
     let addr = state.cfg.bastion_addr.clone();
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -360,8 +365,11 @@ async fn run_bastion(state: Arc<AppState>, host_key: ssh_key::PrivateKey) -> Res
         let _ = peer;
         tokio::spawn(async move {
             match russh::server::run_stream(config, socket, handler).await {
-                Ok(s) => { let _ = s.await; }
-                Err(e) => log::debug!("bastion session error: {e}"),
+                Ok(s) => match s.await {
+                    Ok(_) => log::info!("bastion: session with {peer:?} closed cleanly"),
+                    Err(e) => log::warn!("bastion: session with {peer:?} ended: {e}"),
+                },
+                Err(e) => log::debug!("bastion handshake error: {e}"),
             }
         });
     }
