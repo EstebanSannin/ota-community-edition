@@ -87,6 +87,7 @@ services:
       - ota-lith
     volumes:
       - ./console/index.html:/usr/share/nginx/html/index.html:ro
+      - ./console/apidocs:/usr/share/nginx/html/apidocs:ro
       - ./console/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
   provisioner:

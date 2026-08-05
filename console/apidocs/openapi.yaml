@@ -1,0 +1,371 @@
+openapi: 3.0.3
+info:
+  title: OTA Community Edition — Console API
+  version: "1.0"
+  description: |
+    The HTTP endpoints this console (and your own scripts) use, served **same-origin** through
+    the console's nginx proxy. Every path here is relative to this instance's origin
+    (e.g. `http://your-host:8080`).
+
+    The proxy rewrites and injects the namespace header for you:
+
+    | Console path prefix        | Backend (ota-lith)                         |
+    |----------------------------|--------------------------------------------|
+    | `/api/director/…`          | `:7300/api/v1/…` (director)                |
+    | `/api/device-registry/…`   | `:7300/device-registry/api/v1/…`           |
+    | `/api/reposerver/…`        | `:7100/api/v1/user_repo/…` (reposerver)    |
+
+    `x-ats-namespace: default` is added by the proxy — you don't send it. **Scope:** this documents
+    the subset the console relies on, not the full ota-tuf/director API. Reference only (this page
+    doesn't send live requests).
+servers:
+  - url: /
+    description: This OTA-CE instance (same origin as the console)
+tags:
+  - name: Devices
+    description: List, inspect, rename, and delete provisioned devices
+  - name: Device tags
+    description: Namespace tag definitions and per-device tag values
+  - name: Packages
+    description: Your own uploaded targets (packages) on this repo
+  - name: Package sources
+    description: External TUF delegations you trust (e.g. Torizon feeds)
+  - name: Updates
+    description: Assign a package version to a device (multi-target update)
+  - name: Provisioning
+    description: Enroll a new device
+paths:
+  /api/device-registry/devices:
+    get:
+      tags: [Devices]
+      summary: List devices
+      description: Returns provisioned devices. `attributes` (tags) are populated on THIS list endpoint only.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+        - { name: nameContains, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Paged device list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  values:
+                    type: array
+                    items: { $ref: "#/components/schemas/Device" }
+                  total: { type: integer }
+  /api/device-registry/devices/{uuid}:
+    parameters:
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Devices]
+      summary: Get one device
+      description: Note — unlike the list endpoint, this does NOT include `attributes` (tags).
+      responses:
+        "200": { description: The device, content: { application/json: { schema: { $ref: "#/components/schemas/Device" } } } }
+        "404": { description: Not found }
+    patch:
+      tags: [Devices]
+      summary: Rename / edit a device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceName: { type: string }
+                notes: { type: string, description: "Free-text description" }
+            example: { deviceName: "line-A-gateway", notes: "Shop-floor gateway, bay 3" }
+      responses: { "200": { description: Updated } }
+    delete:
+      tags: [Devices]
+      summary: Delete (decommission) a device
+      description: |
+        Hard-deletes device-registry data (events, group membership, credentials, system_info,
+        tags) and soft-deletes the director's ECU records, in one transaction. Returns `202`.
+        Irreversible.
+      responses: { "202": { description: Accepted — deletion queued } }
+  /api/device-registry/devices/{uuid}/system_info:
+    parameters:
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Devices]
+      summary: Device hardware/OS info
+      description: |
+        The lshw tree plus, when the on-device reporter is installed, a top-level `ota_report`
+        object (kernel, os_release, block devices with fstype/mountpoints, interfaces with
+        MAC/IPv4, loaded modules, eMMC `storage_health`, …).
+      responses: { "200": { description: system_info JSON } }
+  /api/director/admin/devices/{uuid}/ecus:
+    parameters:
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Devices]
+      summary: List a device's ECUs (primary + secondaries)
+      description: Each ECU has `hardwareId`, `primary`, and its currently-installed `image`.
+      responses:
+        "200":
+          description: ECU list
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Ecu" } }
+  /api/device-registry/device_tags:
+    get:
+      tags: [Device tags]
+      summary: List tag definitions
+      description: Derived from tags actually assigned across the namespace (there is no separate tag table).
+      responses:
+        "200":
+          description: Tag definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, properties: { tagId: { type: string }, isDelible: { type: boolean } } }
+  /api/device-registry/device_tags/{tagId}:
+    parameters:
+      - { name: tagId, in: path, required: true, schema: { type: string } }
+    put:
+      tags: [Device tags]
+      summary: Rename a tag (namespace-wide)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { tagId: { type: string } } }, example: { tagId: "region" } } } }
+      responses: { "200": { description: Renamed } }
+    delete:
+      tags: [Device tags]
+      summary: Delete a tag (namespace-wide)
+      description: Removes the tag from every device. Fails if a smart group depends on it.
+      responses: { "200": { description: Deleted } }
+  /api/device-registry/devices/{uuid}/device_tags:
+    parameters:
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Device tags]
+      summary: List a device's tags
+      responses: { "200": { description: "Array of [tagId, value] pairs" } }
+    patch:
+      tags: [Device tags]
+      summary: Set a tag value on a device
+      description: No pre-definition needed — the tag exists once set. tagId ≤20 chars, `[A-Za-z0-9_-]`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [tagId, tagValue], properties: { tagId: { type: string }, tagValue: { type: string } } }
+            example: { tagId: "region", tagValue: "EU" }
+      responses: { "200": { description: Updated tag list } }
+  /api/reposerver/targets.json:
+    get:
+      tags: [Packages]
+      summary: Your signed targets (packages)
+      description: The repo's `targets.json`. `signed.targets` maps `name-version` → hashes/length/custom.
+      responses: { "200": { description: Signed targets metadata } }
+  /api/reposerver/targets/{targetName}:
+    parameters:
+      - { name: targetName, in: path, required: true, schema: { type: string }, description: "Usually `<name>-<version>`" }
+    get:
+      tags: [Packages]
+      summary: Download a package's bytes
+      description: Returns the raw uploaded file (e.g. a docker-compose.yml for a compose package).
+      responses: { "200": { description: Raw file, content: { application/octet-stream: { schema: { type: string, format: binary } } } } }
+    put:
+      tags: [Packages]
+      summary: Upload a package
+      description: Metadata comes from query params; the binary is a multipart `file` part. Description is NOT settable here — use PATCH proprietary-custom afterwards.
+      parameters:
+        - { name: name, in: query, required: true, schema: { type: string } }
+        - { name: version, in: query, required: true, schema: { type: string } }
+        - { name: hardwareIds, in: query, schema: { type: string }, description: "CSV, e.g. docker-compose" }
+        - { name: targetFormat, in: query, schema: { type: string, enum: [BINARY, OSTREE], default: BINARY } }
+      requestBody:
+        content:
+          multipart/form-data:
+            schema: { type: object, properties: { file: { type: string, format: binary } } }
+      responses: { "204": { description: Uploaded } }
+    delete:
+      tags: [Packages]
+      summary: Delete a package
+      description: Removes the blob + metadata and re-signs targets.json. Returns 204.
+      responses: { "204": { description: Deleted } }
+  /api/reposerver/proprietary-custom/{targetName}:
+    parameters:
+      - { name: targetName, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [Packages]
+      summary: Set custom metadata (e.g. description)
+      description: Deep-merges the JSON into the target's `custom` (flattens to top-level keys). No re-upload; re-signs roles. `{}` clears.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+            example: { description: "## FileBrowser\nWeb file manager. See `docker-compose.yml`." }
+      responses: { "204": { description: Merged } }
+  /api/reposerver/trusted-delegations:
+    get:
+      tags: [Package sources]
+      summary: List sources (delegation roles)
+      responses: { "200": { description: "Array of delegation roles (name, paths, keyids, …)" } }
+    put:
+      tags: [Package sources]
+      summary: Replace the delegation role set
+      description: ⚠️ REPLACES the whole set — always PUT existing + new, or you delete other sources.
+      requestBody: { required: true, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DelegationRole" } } } } }
+      responses: { "204": { description: Set } }
+  /api/reposerver/trusted-delegations/keys:
+    get:
+      tags: [Package sources]
+      summary: List delegation signing keys
+      responses: { "200": { description: Array of public keys } }
+    put:
+      tags: [Package sources]
+      summary: Replace the delegation key set
+      description: ⚠️ REPLACES the whole set (merge like the roles endpoint).
+      requestBody: { required: true, content: { application/json: { schema: { type: array, items: { type: object } } } } }
+      responses: { "204": { description: Set } }
+  /api/reposerver/trusted-delegations/{name}/remote:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    put:
+      tags: [Package sources]
+      summary: Register / update a source's remote (fetch URL + display name)
+      description: The backend then pulls the signed delegation from `uri`. Also used to edit the friendly name. Returns a plain-text 201.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [uri], properties: { uri: { type: string }, friendlyName: { type: string } } }
+            example: { uri: "https://…/delegations/tdx-quarterly.json", friendlyName: "TDX Quarterly" }
+      responses: { "201": { description: Registered } }
+  /api/reposerver/trusted-delegations/{name}/remote/refresh:
+    parameters: [{ name: name, in: path, required: true, schema: { type: string } }]
+    put:
+      tags: [Package sources]
+      summary: Re-fetch a source now
+      responses: { "200": { description: Refreshed } }
+  /api/reposerver/trusted-delegations/{name}/info:
+    parameters: [{ name: name, in: path, required: true, schema: { type: string } }]
+    get:
+      tags: [Package sources]
+      summary: Source info (friendlyName, remoteUri, lastFetched, expires)
+      responses: { "200": { description: Info JSON } }
+  /api/reposerver/trusted-delegations/{name}:
+    parameters: [{ name: name, in: path, required: true, schema: { type: string } }]
+    delete:
+      tags: [Package sources]
+      summary: Remove a source
+      responses: { "200": { description: Removed } }
+  /api/reposerver/delegations_items:
+    get:
+      tags: [Package sources]
+      summary: Browse delegated target items (packages from sources)
+      parameters:
+        - { name: nameContains, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Delegated items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  values:
+                    type: array
+                    items: { type: object, properties: { targetFilename: { type: string }, delegatedRoleName: { type: string }, clientTargetItem: { type: object } } }
+  /api/director/multi_target_updates:
+    post:
+      tags: [Updates]
+      summary: Create a multi-target update (MTU)
+      description: Defines what to install per hardware id. Returns the MTU id (a quoted UUID string).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MtuRequest" }
+            example:
+              targets:
+                verdin-imx8mp:
+                  to:
+                    target: "scarthgap/verdin-imx8mp/torizon/torizon-docker/release-7.6.1+build.38"
+                    checksum: { method: sha256, hash: "7517fc89…" }
+                    targetLength: 0
+                    uri: "https://…/ostree-repo/"
+      responses: { "200": { description: MTU id (quoted UUID) } }
+  /api/director/assignments:
+    post:
+      tags: [Updates]
+      summary: Assign an MTU to devices
+      description: Queues the update; the device installs it on its next check-in. `affected` lists devices actually targeted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mtuId, devices]
+              properties:
+                mtuId: { type: string, format: uuid }
+                correlationId: { type: string, example: "urn:here-ota:mtu:<mtuId>" }
+                devices: { type: array, items: { type: string, format: uuid } }
+      responses: { "200": { description: "{ affected: [uuid…] }" } }
+  /provision-device.sh:
+    get:
+      tags: [Provisioning]
+      summary: Provisioning script
+      description: Run on the device as root to enroll it (Torizon-style). Pipe to bash.
+      responses: { "200": { description: Shell script } }
+  /api/provision:
+    post:
+      tags: [Provisioning]
+      summary: Mint provisioning credentials
+      description: Used by the script/console to create device credentials (optionally gated by a token).
+      responses: { "200": { description: Credentials } }
+components:
+  schemas:
+    Device:
+      type: object
+      properties:
+        uuid: { type: string, format: uuid }
+        deviceId: { type: string }
+        deviceName: { type: string }
+        notes: { type: string }
+        deviceStatus: { type: string, enum: [UpToDate, Outdated, UpdatePending, UpdateScheduled, Error] }
+        lastSeen: { type: string, format: date-time }
+        attributes: { type: object, additionalProperties: { type: string }, description: "Tag map — list endpoint only" }
+    Ecu:
+      type: object
+      properties:
+        ecuSerial: { type: string }
+        hardwareId: { type: string }
+        primary: { type: boolean }
+        image:
+          type: object
+          properties:
+            filepath: { type: string }
+            hash: { type: string }
+    DelegationRole:
+      type: object
+      properties:
+        name: { type: string }
+        keyids: { type: array, items: { type: string } }
+        paths: { type: array, items: { type: string }, example: ["*/release-*"] }
+        threshold: { type: integer }
+        terminating: { type: boolean }
+    MtuRequest:
+      type: object
+      properties:
+        targets:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              to:
+                type: object
+                properties:
+                  target: { type: string }
+                  checksum: { type: object, properties: { method: { type: string }, hash: { type: string } } }
+                  targetLength: { type: integer }
+                  uri: { type: string }
