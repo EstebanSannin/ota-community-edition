@@ -76,6 +76,8 @@ struct AppState {
     tuf_key: Box<dyn Sign + Send + Sync>,
     signed_root: Signed<Root>,
     bastion_pub: ssh_key::PublicKey,
+    // active reverse-tunnel listeners keyed by port, so a device reconnect cancels the stale one
+    port_listeners: Mutex<HashMap<u16, tokio::task::AbortHandle>>,
 }
 
 // ---------------- persistence helpers ----------------
@@ -311,11 +313,19 @@ impl russh::server::Handler for BastionConn {
             return Ok(false);
         }
         let bind_port = want;
+        // cancel any stale listener for this port (e.g. from a previous connection of this device)
+        if let Some(old) = self.state.port_listeners.lock().unwrap().remove(&bind_port) { old.abort(); }
         let handle = session.handle();
-        tokio::spawn(async move {
-            let listener = match tokio::net::TcpListener::bind(("0.0.0.0", bind_port)).await {
-                Ok(l) => l, Err(e) => { log::error!("bastion: bind {bind_port} failed: {e}"); return; }
-            };
+        let task = tokio::spawn(async move {
+            // retry a few times: the aborted stale listener may take a moment to free the port
+            let mut listener = None;
+            for _ in 0..15 {
+                match tokio::net::TcpListener::bind(("0.0.0.0", bind_port)).await {
+                    Ok(l) => { listener = Some(l); break; }
+                    Err(_) => tokio::time::sleep(std::time::Duration::from_millis(200)).await,
+                }
+            }
+            let Some(listener) = listener else { log::error!("bastion: could not bind {bind_port} for {uuid}"); return; };
             log::info!("bastion: reverse listener open on 0.0.0.0:{bind_port} for {uuid}");
             loop {
                 let (mut ingress, addr) = match listener.accept().await { Ok(x) => x, Err(_) => break };
@@ -329,6 +339,7 @@ impl russh::server::Handler for BastionConn {
                 });
             }
         });
+        self.state.port_listeners.lock().unwrap().insert(bind_port, task.abort_handle());
         Ok(true)
     }
 }
@@ -397,7 +408,7 @@ async fn main() -> Result<()> {
     let conn = Connection::open(cfg.data_dir.join("ras.db"))?;
     init_db(&conn)?;
 
-    let state = Arc::new(AppState { cfg: cfg.clone(), db: Mutex::new(conn), tuf_key, signed_root, bastion_pub });
+    let state = Arc::new(AppState { cfg: cfg.clone(), db: Mutex::new(conn), tuf_key, signed_root, bastion_pub, port_listeners: Mutex::new(HashMap::new()) });
 
     tokio::spawn(cleanup_loop(state.clone()));
     let bastion_state = state.clone();
