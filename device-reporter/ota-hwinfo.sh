@@ -14,18 +14,18 @@ kernel=$(uname -r); arch=$(uname -m)
 kbuild=$(cat /proc/version 2>/dev/null || true)
 cmdline=$(cat /proc/cmdline 2>/dev/null || true)
 governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true)
-device_tree=$(tr -d '\0' </proc/device-tree/model 2>/dev/null || true)
+device_tree=$(cat /proc/device-tree/model 2>/dev/null | tr -d '\0' || true)   # ARM only; absent on x86
 last_boot=$(uptime -s 2>/dev/null || true)
 modules=$(lsmod 2>/dev/null | awk 'NR>1{print $1}' | paste -sd, -)
 os_name=""; os_version=""; os_variant=""; os_id=""
 if [ -r /etc/os-release ]; then . /etc/os-release; os_name=${NAME:-}; os_version=${VERSION:-}; os_variant=${VARIANT:-}; os_id=${ID:-}; fi
-usb=$(lsusb 2>/dev/null | jq -R . | jq -s . 2>/dev/null || echo '[]')
-block=$(lsblk -J -o NAME,SIZE,TYPE,FSTYPE,MODEL,TRAN,MOUNTPOINTS 2>/dev/null || echo '{"blockdevices":[]}')
+# NB: no `|| echo` inside these pipelines — under `set -o pipefail` a tool that both
+# prints output and exits non-zero (e.g. lsusb with no devices on x86) would concatenate
+# the fallback onto the real output, yielding two JSON values. Capture, then default if empty.
+usb=$(lsusb 2>/dev/null | jq -R . | jq -s . 2>/dev/null); [ -n "$usb" ] || usb='[]'
+block=$(lsblk -J -o NAME,SIZE,TYPE,FSTYPE,MODEL,TRAN,MOUNTPOINTS 2>/dev/null); [ -n "$block" ] || block='{"blockdevices":[]}'
 # interfaces as objects {name,state,mac,ipv4} — ip -j gives structured output on modern iproute2
-nics=$(ip -j addr show 2>/dev/null | jq -c '[.[] | {name:.ifname, state:.operstate, mac:(.address//null), ipv4:([.addr_info[]?|select(.family=="inet")|.local]|first//null)}]' 2>/dev/null || echo '[]')
-[ -n "$usb" ]   || usb='[]'
-[ -n "$block" ] || block='{"blockdevices":[]}'
-[ -n "$nics" ]  || nics='[]'
+nics=$(ip -j addr show 2>/dev/null | jq -c '[.[] | {name:.ifname, state:.operstate, mac:(.address//null), ipv4:([.addr_info[]?|select(.family=="inet")|.local]|first//null)}]' 2>/dev/null); [ -n "$nics" ] || nics='[]'
 
 # --- assemble: the lshw tree + a clean top-level ota_report object ---
 printf '%s' "$lshw_json" | jq \
