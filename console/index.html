@@ -93,7 +93,8 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
 .modal .m .mbody .ml{display:block;font-size:12px;color:var(--text-dim);margin-bottom:7px;font-weight:600}
 .modal .m .mbody .mf{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box} .modal .m .mbody .mf:focus{outline:none;border-color:var(--accent)} .modal .m .mbody textarea.mf{resize:vertical;min-height:64px}
 .modal .m .mbody .mmsg{margin:0;color:var(--text);line-height:1.55;font-size:14px}
-.modal .m footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface-2)}
+.modal .m footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface-2)} .modal .m footer .grow{flex:1}
+.cmdbox{display:flex;align-items:center;gap:8px;background:#0a1119;border-radius:9px;padding:10px 12px} .cmdbox code{font-family:var(--mono);font-size:12.5px;flex:1;word-break:break-all;color:#d6e2f0} .cmdbox .btn{flex:none}
 .modal .m .btn.dbad{background:var(--bad);border-color:var(--bad);color:#fff}
 .modal .m .picklist{padding:14px 14px 6px;max-height:56vh;overflow:auto}
 .pickrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:11px 13px;border:1px solid var(--border);border-radius:9px;background:var(--surface);cursor:pointer;margin-bottom:9px;font-family:inherit} .pickrow:hover{border-color:var(--accent);background:var(--accent-weak)} .pickrow .pk-t{font-weight:620;font-size:14px;color:var(--text)} .pickrow .pk-s{font-size:12px;color:var(--text-dim);font-family:var(--mono)}
@@ -372,6 +373,44 @@ async function confirmDelete(uuids){
 }
 async function deleteCurrentDevice(){const u=CUR&&CUR.uuid;if(!u)return;await confirmDelete([u]);if(!DEVICES.some(d=>d.uuid===u))go('devices');}
 
+// ---------- remote access (RAC reverse-SSH via ras) ----------
+async function remoteAccess(){
+  const uuid=CUR&&CUR.uuid; if(!uuid)return;
+  let opkey=(localStorage.getItem('opSshPubkey')||'').trim();
+  if(!opkey){
+    opkey=((await uiPrompt({title:'Your SSH public key',label:'Paste your PUBLIC key — it will be authorized on the device for this session',placeholder:'ssh-ed25519 AAAA… you@laptop',ok:'Save & continue'}))||'').trim();
+    if(!opkey)return;
+    localStorage.setItem('opSshPubkey',opkey);
+  }
+  toast('Arming remote access…');
+  try{
+    const r=await api('/api/ras/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uuid,operator_pubkey:opkey,ttl_secs:1800})});
+    showRemoteModal(typeof r==='object'?r:JSON.parse(r));
+  }catch(e){toast('Remote access unavailable — is the ras service deployed? ('+(e.message||e)+')');}
+}
+async function stopRemoteAccess(uuid,ov){
+  try{await api('/api/ras/sessions/'+encodeURIComponent(uuid),{method:'DELETE'});toast('Remote access stopped');}
+  catch(e){toast('Stop failed: '+(e.message||e));}
+  if(ov)ov.remove();
+}
+function showRemoteModal(r){
+  const cmd=r.ssh_command||'';const uuid=CUR&&CUR.uuid;
+  const ov=document.createElement('div');ov.className='modal open';
+  ov.innerHTML=`<div class="m mini"><header><h3>Remote access ready</h3></header>
+    <div class="mbody">
+      <p class="mmsg" style="margin:0 0 10px">Run this on your computer — the device connects within a few seconds:</p>
+      <div class="cmdbox"><code id="ra-cmd"></code><button class="btn sm" id="ra-copy">Copy</button></div>
+      <p class="muted" style="font-size:12px;margin:10px 0 0">Authorized with your saved SSH key. Session expires ${r.expires_at?relTime(r.expires_at).replace('ago','from now'):'in 30 min'}. Reverse port ${esc(String(r.reverse_port||''))}.</p>
+    </div>
+    <footer><button class="btn dbad" id="ra-stop">Stop remote access</button><span class="grow"></span><button class="btn mok primary">Done</button></footer></div>`;
+  ov.querySelector('#ra-cmd').textContent=cmd;
+  ov.querySelector('#ra-copy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(cmd);toast('Copied');};
+  ov.querySelector('#ra-stop').onclick=()=>stopRemoteAccess(uuid,ov);
+  ov.querySelector('.mok').onclick=()=>ov.remove();
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+}
+
 // ---------- device detail ----------
 let CUR=null;           // {uuid, device, ecus, sysinfo, packages, events}
 const H=svg=>`<svg class="hi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${svg}</svg>`;
@@ -473,6 +512,7 @@ function renderDetail(){
       </div>
       <div class="dactions">
         <button class="btn primary" onclick="deployPrompt('${esc(hwOf(uuid))}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Deploy update</button>
+        <button class="btn" onclick="remoteAccess()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>Remote access</button>
         <button class="btn" onclick="toast('Rollback isn\\'t wired yet — coming soon')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Roll back</button>
       </div>
     </div>
