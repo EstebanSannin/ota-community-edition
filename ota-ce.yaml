@@ -91,6 +91,7 @@ services:
     volumes:
       - ./console/index.html:/usr/share/nginx/html/index.html:ro
       - ./console/apidocs:/usr/share/nginx/html/apidocs:ro
+      - ./console/vendor:/usr/share/nginx/html/vendor:ro
       - ./console/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
   # Device provisioning service — serves provision-device.sh and mints+registers device

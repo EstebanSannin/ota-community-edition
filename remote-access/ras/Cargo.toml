@@ -12,7 +12,7 @@ path = "src/main.rs"
 # Versions mirror torizon/rac (proven to compile together with the toradex/tough fork).
 [dependencies]
 tokio = { version = "1.38", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "signal"] }
-axum = "0.6.7"
+axum = { version = "0.6.7", features = ["ws"] }
 tower = "0.4"
 russh = "0.46.0"
 russh-keys = "0.46.0"

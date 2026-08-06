@@ -14,12 +14,14 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use axum::{
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
     Json, Router,
 };
+use futures::{SinkExt, StreamExt};
 use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -76,6 +78,10 @@ struct AppState {
     tuf_key: Box<dyn Sign + Send + Sync>,
     signed_root: Signed<Root>,
     bastion_pub: ssh_key::PublicKey,
+    // ras's own SSH client identity: its pubkey is authorized on devices (via remote-sessions) so
+    // the web-terminal can SSH into a device through its reverse tunnel.
+    console_pub: ssh_key::PublicKey,
+    console_keypair: Arc<russh_keys::key::KeyPair>,
     // active reverse-tunnel listeners keyed by port, so a device reconnect cancels the stale one
     port_listeners: Mutex<HashMap<u16, tokio::task::AbortHandle>>,
 }
@@ -139,6 +145,11 @@ async fn build_root(key: &dyn Sign) -> Result<Signed<Root>> {
 }
 
 async fn build_remote_sessions(state: &AppState, operator_keys: Vec<ssh_key::PublicKey>) -> Result<Signed<RemoteSessions>> {
+    // Always authorize ras's own console key too, so the browser web-terminal can log in over the
+    // tunnel (the device only ever exposes its sshd when a session is armed, so this is inert
+    // otherwise). It sits alongside the operator's own key(s).
+    let mut operator_keys = operator_keys;
+    operator_keys.push(state.console_pub.clone());
     let mut authorized_keys_map = HashMap::<usize, serde_json::Value>::new();
     for (idx, k) in operator_keys.iter().enumerate() { authorized_keys_map.insert(idx, json!({ "pubkey": k })); }
     let ssh = json!({ "ssh": {
@@ -278,6 +289,102 @@ async fn admin_list_sessions(State(st): State<Arc<AppState>>) -> Response {
     Json(json!({ "values": rows })).into_response()
 }
 
+// ---------------- web terminal (WS <-> SSH over the reverse tunnel) ----------------
+// russh client handler: the device sshd is only reachable through its own authenticated reverse
+// tunnel (bound per-session for exactly this device), so accepting its host key here is safe.
+struct TermClient;
+#[async_trait]
+impl russh::client::Handler for TermClient {
+    type Error = eyre::Error;
+    async fn check_server_key(&mut self, key: &russh_keys::key::PublicKey) -> Result<bool> {
+        log::info!("web-terminal: device host key {}", key.public_key_base64());
+        Ok(true)
+    }
+}
+
+async fn admin_terminal(State(st): State<Arc<AppState>>, Path(uuid): Path<String>, ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(move |socket| terminal_session(st, uuid, socket))
+}
+
+// Send a human-readable notice to the xterm and close.
+async fn term_fail(mut socket: WebSocket, msg: String) {
+    log::warn!("web-terminal: {msg}");
+    let _ = socket.send(Message::Text(format!("\r\n\x1b[31m[web-terminal] {msg}\x1b[0m\r\n"))).await;
+    let _ = socket.close().await;
+}
+
+async fn terminal_session(st: Arc<AppState>, uuid: String, socket: WebSocket) {
+    let Some((_, port, _)) = active_session(&st, &uuid) else {
+        return term_fail(socket, format!("no active remote-access session for {uuid} — arm one first")).await;
+    };
+    // Reach the device sshd through its reverse tunnel (the bastion listens on this port locally).
+    let tcp = match tokio::net::TcpStream::connect(("127.0.0.1", port)).await {
+        Ok(s) => s,
+        Err(e) => return term_fail(socket, format!("tunnel not up on port {port} ({e}) — is the device connected?")).await,
+    };
+    let config = Arc::new(russh::client::Config::default());
+    let mut handle = match russh::client::connect_stream(config, tcp, TermClient).await {
+        Ok(h) => h,
+        Err(e) => return term_fail(socket, format!("ssh handshake to device failed: {e}")).await,
+    };
+    let user = st.cfg.ssh_user.clone();
+    match handle.authenticate_publickey(user.clone(), st.console_keypair.clone()).await {
+        Ok(true) => {}
+        Ok(false) => return term_fail(socket, format!("device rejected the console key for user '{user}' (re-arm the session so rac re-authorizes it)")).await,
+        Err(e) => return term_fail(socket, format!("ssh auth error: {e}")).await,
+    }
+    let mut channel = match handle.channel_open_session().await {
+        Ok(c) => c,
+        Err(e) => return term_fail(socket, format!("could not open ssh channel: {e}")).await,
+    };
+    if let Err(e) = channel.request_pty(false, "xterm-256color", 80, 24, 0, 0, &[]).await {
+        return term_fail(socket, format!("pty request failed: {e}")).await;
+    }
+    if let Err(e) = channel.request_shell(true).await {
+        return term_fail(socket, format!("shell request failed: {e}")).await;
+    }
+    log::info!("web-terminal: shell open for {uuid} (user {user}, port {port})");
+
+    let (mut ws_tx, mut ws_rx) = socket.split();
+    loop {
+        tokio::select! {
+            msg = channel.wait() => match msg {
+                Some(russh::ChannelMsg::Data { data }) => {
+                    if ws_tx.send(Message::Binary(data.to_vec())).await.is_err() { break; }
+                }
+                Some(russh::ChannelMsg::ExtendedData { data, .. }) => {
+                    if ws_tx.send(Message::Binary(data.to_vec())).await.is_err() { break; }
+                }
+                Some(russh::ChannelMsg::ExitStatus { exit_status }) => {
+                    let _ = ws_tx.send(Message::Text(format!("\r\n\x1b[90m[session exited: {exit_status}]\x1b[0m\r\n"))).await;
+                }
+                Some(russh::ChannelMsg::Eof) | Some(russh::ChannelMsg::Close) | None => break,
+                _ => {}
+            },
+            wsm = ws_rx.next() => match wsm {
+                Some(Ok(Message::Binary(b))) => { if channel.data(&b[..]).await.is_err() { break; } }
+                Some(Ok(Message::Text(t))) => {
+                    // {"resize":{"cols":C,"rows":R}} is a control message; anything else is input.
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&t) {
+                        if let Some(r) = v.get("resize") {
+                            let cols = r.get("cols").and_then(|x| x.as_u64()).unwrap_or(80) as u32;
+                            let rows = r.get("rows").and_then(|x| x.as_u64()).unwrap_or(24) as u32;
+                            let _ = channel.window_change(cols, rows, 0, 0).await;
+                            continue;
+                        }
+                    }
+                    if channel.data(t.as_bytes()).await.is_err() { break; }
+                }
+                Some(Ok(Message::Close(_))) | None => break,
+                Some(Err(_)) => break,
+                _ => {}
+            }
+        }
+    }
+    let _ = channel.eof().await;
+    log::info!("web-terminal: session for {uuid} closed");
+}
+
 // ---------------- SSH bastion ----------------
 #[derive(Clone)]
 struct Bastion { state: Arc<AppState> }
@@ -404,6 +511,7 @@ fn app_router(state: Arc<AppState>) -> Router {
         .route("/director/remote-sessions.json", get(get_remote_sessions))
         .route("/admin/sessions", get(admin_list_sessions).post(admin_create_session))
         .route("/admin/sessions/:uuid", delete(admin_delete_session))
+        .route("/admin/terminal/:uuid", get(admin_terminal))
         .with_state(state)
 }
 
@@ -420,10 +528,16 @@ async fn main() -> Result<()> {
     let tuf_key = load_or_gen_tuf_key(&cfg.data_dir.join("tuf_ed25519.pk8"))?;
     let signed_root = build_root(&*tuf_key).await?;
 
+    // ras's own SSH client identity for the web terminal (authorized on devices via remote-sessions)
+    let console_key = load_or_gen_bastion_key(&cfg.data_dir.join("console_client_key"))?;
+    let console_pub = console_key.public_key().clone();
+    log::info!("console client key: {}", console_pub.to_openssh()?);
+    let console_keypair = Arc::new(russh_keys::decode_openssh(&console_key.to_bytes()?, None)?);
+
     let conn = Connection::open(cfg.data_dir.join("ras.db"))?;
     init_db(&conn)?;
 
-    let state = Arc::new(AppState { cfg: cfg.clone(), db: Mutex::new(conn), tuf_key, signed_root, bastion_pub, port_listeners: Mutex::new(HashMap::new()) });
+    let state = Arc::new(AppState { cfg: cfg.clone(), db: Mutex::new(conn), tuf_key, signed_root, bastion_pub, console_pub, console_keypair, port_listeners: Mutex::new(HashMap::new()) });
 
     tokio::spawn(cleanup_loop(state.clone()));
     let bastion_state = state.clone();

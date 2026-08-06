@@ -1,6 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OTA Community Edition — Console</title>
+<link rel="stylesheet" href="/vendor/xterm.css">
 <style>
 :root{
   --bg:#f4f7fa; --surface:#ffffff; --surface-2:#eef2f7; --surface-3:#e6ecf3;
@@ -145,6 +146,11 @@ pre.code{margin:0;padding:14px 16px;background:#0a1119;color:#d6e2f0;font-family
 .keyrow .kt{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px;background:var(--accent-weak);color:var(--accent);text-transform:uppercase}
 .keyrow .ki{flex:1;min-width:0} .keyrow .kc{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .keyrow .kf{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .keyrow .krm{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);display:grid;place-items:center;color:var(--text-faint);flex:none} .keyrow .krm:hover{color:var(--bad);border-color:var(--bad)} .keyrow .krm svg{width:15px;height:15px}
+.termmodal{width:min(940px,96vw)} .termmodal header{gap:10px}
+.termstatus{font-size:11.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:20px;background:var(--surface-2);color:var(--text-dim)}
+.termstatus.ok{background:var(--ok-bg);color:var(--ok)} .termstatus.bad{background:var(--bad-bg);color:var(--bad)}
+.termhost{height:min(62vh,540px);padding:8px 6px 4px 10px;background:#0b0f14;border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+.termhost .xterm{height:100%}
 /* ---- device detail ---- */
 .back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;text-decoration:none;margin-bottom:16px;cursor:pointer} .back:hover{color:var(--text)} .back svg{width:16px;height:16px}
 .dhdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
@@ -301,6 +307,8 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
 
 <div class="toast" id="toast"></div>
 
+<script src="/vendor/xterm.js"></script>
+<script src="/vendor/xterm-addon-fit.js"></script>
 <script>
 const api=(p,o)=>fetch(p,o).then(async r=>{if(!r.ok)throw new Error((await r.text())||r.status);const t=await r.text();if(!t)return null;try{return JSON.parse(t);}catch(e){return t;}});
 const rapi=p=>'/api/reposerver/user_repo/'+p;
@@ -438,10 +446,12 @@ function showRemoteModal(r){
       <div class="cmdbox"><code id="ra-cmd"></code><button class="btn sm" id="ra-copy">Copy</button></div>
       <p class="muted" style="font-size:12px;margin:10px 0 0">Authorized with your saved SSH key. Session expires ${r.expires_at?relTime(r.expires_at).replace('ago','from now'):'in 30 min'}. Reverse port ${esc(String(r.reverse_port||''))}.</p>
     </div>
-    <footer><button class="btn dbad" id="ra-stop">Stop remote access</button><span class="grow"></span><button class="btn mok primary">Done</button></footer></div>`;
+    <footer><button class="btn dbad" id="ra-stop">Stop remote access</button><span class="grow"></span><button class="btn" id="ra-web">⧉ Open web terminal</button><button class="btn mok primary">Done</button></footer></div>`;
   ov.querySelector('#ra-cmd').textContent=cmd;
   ov.querySelector('#ra-copy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(cmd);toast('Copied');};
   ov.querySelector('#ra-stop').onclick=()=>stopRemoteAccess(uuid,ov);
+  const nm=(CUR&&CUR.device&&(CUR.device.deviceName||CUR.device.deviceId))||uuid;
+  ov.querySelector('#ra-web').onclick=()=>openTerminal(uuid,nm);
   ov.querySelector('.mok').onclick=()=>ov.remove();
   ov.addEventListener('mousedown',e=>{if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
@@ -506,10 +516,42 @@ async function loadRaSessions(){
   el.innerHTML=`<table><thead><tr><th>Device</th><th>Reverse port</th><th>Expires</th><th class="right">Action</th></tr></thead><tbody>${vals.map(s=>{
     const d=DEVICES.find(x=>x.uuid===s.uuid);const nm=d?(d.deviceName||d.deviceId):s.uuid;
     const exp=s.expires_at?relTime(s.expires_at).replace(' ago',' left'):'—';
-    return `<tr><td><div class="dev"><span class="av" style="width:28px;height:28px;border-radius:7px">${avatar}</span><div class="nm">${esc(nm)}</div></div></td><td class="mono">${esc(String(s.reverse_port))}</td><td class="muted">${esc(exp)}</td><td class="right"><button class="btn sm danger" onclick="killSession('${esc(s.uuid)}')">Kill</button></td></tr>`;
+    const nmj=esc(nm).replace(/'/g,"\\'");
+    return `<tr><td><div class="dev"><span class="av" style="width:28px;height:28px;border-radius:7px">${avatar}</span><div class="nm">${esc(nm)}</div></div></td><td class="mono">${esc(String(s.reverse_port))}</td><td class="muted">${esc(exp)}</td><td class="right"><button class="btn sm" onclick="openTerminal('${esc(s.uuid)}','${nmj}')">Terminal</button> <button class="btn sm danger" onclick="killSession('${esc(s.uuid)}')">Kill</button></td></tr>`;
   }).join('')}</tbody></table>`;
 }
 function saveTtl(){const v=document.getElementById('ra-ttl').value;localStorage.setItem('raTtl',v);toast('Default duration saved');}
+// ---------- web terminal (xterm.js <-> ras WS <-> reverse tunnel <-> device sshd) ----------
+function openTerminal(uuid,name){
+  if(typeof Terminal==='undefined'){toast('Terminal library failed to load');return;}
+  const FitCtor=(window.FitAddon&&window.FitAddon.FitAddon)||window.FitAddon;
+  const ov=document.createElement('div');ov.className='modal open';
+  ov.innerHTML=`<div class="m termmodal"><header><h3>Terminal — ${esc(name||uuid)}</h3><span class="grow"></span><span class="termstatus" id="term-status">connecting…</span><button class="btn sm mcancel">Close</button></header>
+    <div class="termhost" id="term-host"></div></div>`;
+  document.body.appendChild(ov);
+  const status=ov.querySelector('#term-status');
+  const term=new Terminal({fontFamily:"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace",fontSize:13,cursorBlink:true,scrollback:5000,
+    theme:{background:'#0b0f14',foreground:'#e9eef5',cursor:'#25d0bf',selectionBackground:'#2b3a4d'}});
+  let fit=null; if(FitCtor){try{fit=new FitCtor();term.loadAddon(fit);}catch(e){}}
+  term.open(ov.querySelector('#term-host'));
+  try{fit&&fit.fit();}catch(e){}
+  const proto=location.protocol==='https:'?'wss':'ws';
+  const ws=new WebSocket(`${proto}://${location.host}/api/ras/terminal/${encodeURIComponent(uuid)}`);
+  ws.binaryType='arraybuffer';
+  const setStatus=(t,cls)=>{status.textContent=t;status.className='termstatus'+(cls?' '+cls:'');};
+  const enc=new TextEncoder();
+  function sendResize(){if(ws.readyState===1)ws.send(JSON.stringify({resize:{cols:term.cols,rows:term.rows}}));}
+  ws.onopen=()=>{setStatus('connected','ok');term.focus();sendResize();};
+  ws.onmessage=(e)=>{if(typeof e.data==='string')term.write(e.data);else term.write(new Uint8Array(e.data));};
+  ws.onerror=()=>setStatus('error','bad');
+  ws.onclose=()=>{setStatus('disconnected','bad');try{term.write('\r\n\x1b[90m[connection closed]\x1b[0m\r\n');}catch(e){}};
+  term.onData(d=>{if(ws.readyState===1)ws.send(enc.encode(d));});
+  const onResize=()=>{try{fit&&fit.fit();}catch(e){}sendResize();};
+  window.addEventListener('resize',onResize);
+  function close(){window.removeEventListener('resize',onResize);try{ws.close();}catch(e){}try{term.dispose();}catch(e){}ov.remove();}
+  ov.querySelector('.mcancel').onclick=close;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close();});
+}
 async function killSession(uuid){
   if(!(await uiConfirm({title:'Kill session?',message:'Stop the remote-access tunnel for this device now?',ok:'Kill',danger:true})))return;
   try{await api('/api/ras/sessions/'+encodeURIComponent(uuid),{method:'DELETE'});toast('Session killed');}catch(e){toast('Kill failed: '+(e.message||e));}
