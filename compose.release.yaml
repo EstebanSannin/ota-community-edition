@@ -7,10 +7,20 @@
 #
 # Only ota-lith and provisioner are our images; the rest are stock nginx/mariadb + mounted
 # config, so this file still uses the repo's config files and the locally-generated ota-ce-gen/.
+
+# Cap per-container logs so they can't fill the disk (5 x 10 MB each). Applied to every service
+# via the *default-logging anchor below — no host daemon.json / docker restart needed.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   reverse-proxy:
     image: nginx:1.27
     restart: always
+    logging: *default-logging
     # internal only (reached by the gateway via the docker network); never published to the host,
     # so it can't be hit from the public internet and leaves port 80 free for the Caddy front.
     expose:
@@ -23,6 +33,7 @@ services:
   gateway:
     image: nginx:1.27
     restart: always
+    logging: *default-logging
     command: ["nginx-debug", "-g", "daemon off;"]
     expose:
       - '80'
@@ -42,6 +53,7 @@ services:
   db:
     image: mariadb:10.11
     restart: always
+    logging: *default-logging
     environment:
       MYSQL_ROOT_PASSWORD: 'root'
     command:
@@ -66,6 +78,7 @@ services:
   ota-lith:
     image: ${OTA_CE_NS:?set OTA_CE_NS to your image namespace}/ota-lith:${OTA_CE_TAG:-latest}
     restart: always
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
@@ -84,6 +97,7 @@ services:
   console:
     image: nginx:1.27
     restart: always
+    logging: *default-logging
     # On a public VPS set CONSOLE_BIND=127.0.0.1 so the console is only reachable via the Caddy
     # TLS+password front (compose.public.yaml); on a LAN it defaults to all interfaces.
     ports:
@@ -99,6 +113,7 @@ services:
   provisioner:
     image: ${OTA_CE_NS:?set OTA_CE_NS to your image namespace}/ota-ce-provisioner:${OTA_CE_TAG:-latest}
     restart: always
+    logging: *default-logging
     depends_on:
       - ota-lith
     environment:
@@ -122,6 +137,7 @@ services:
   ras:
     image: ${OTA_CE_NS:?set OTA_CE_NS to your image namespace}/ras:${OTA_CE_TAG:-latest}
     restart: always
+    logging: *default-logging
     environment:
       - RAS_BASTION_PUBLIC_HOST=${RAS_PUBLIC_HOST:-ota.ce}
       - RAS_SSH_USER=${RAS_SSH_USER:-torizon}

@@ -12,10 +12,17 @@
 #   OTA_CE_NS=... OTA_CE_TAG=...           # (as for compose.release.yaml)
 #
 # See docs/vps-deploy.md for the full runbook (firewall, DNS, provisioning).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   caddy:
     image: caddy:2
     restart: always
+    logging: *default-logging
     depends_on:
       - console
     ports:
