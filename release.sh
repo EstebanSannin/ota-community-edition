@@ -21,6 +21,7 @@ TAG="${TAG:-latest}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 LITH="$NS/ota-lith"
 PROV="$NS/ota-ce-provisioner"
+RAS="$NS/ras"
 
 echo "== namespace: $NS   tag: $TAG   platforms: $PLATFORMS"
 
@@ -41,11 +42,22 @@ docker buildx build --platform "$PLATFORMS" \
   -t "$PROV:$TAG" -t "$PROV:latest" \
   --push provisioner
 
+# The ras binary is compiled per-arch inside the Dockerfile, so the non-native arch builds
+# under QEMU emulation and can be slow. Set PLATFORMS=linux/amd64 (or your target only) to
+# speed it up, or RAS=skip to skip it.
+if [ "${RAS:-}" != "skip" ]; then
+  echo "== building + pushing $RAS ($TAG, latest)  [Rust multi-arch — may be slow under emulation]"
+  docker buildx build --platform "$PLATFORMS" \
+    -t "$RAS:$TAG" -t "$RAS:latest" \
+    --push remote-access/ras
+fi
+
 cat <<EOF
 
   ✔ Pushed:
       $LITH:$TAG   (and :latest)
       $PROV:$TAG   (and :latest)
+      $RAS:$TAG   (and :latest)
 
   Run the release stack elsewhere with:
       export OTA_CE_NS=$NS OTA_CE_TAG=$TAG

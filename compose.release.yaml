@@ -104,6 +104,28 @@ services:
       - ./ota-ce-gen:/gen:ro
       - ./scripts/certs:/certs:ro
 
+  # Remote access server (RAC-compatible reverse-SSH). Optional — see remote-access/README.md.
+  # Set RAS_PUBLIC_HOST to the public hostname devices + operators reach (your dyndns/VPS name).
+  # The HTTP API (9080) stays internal; the gateway (/ras/) and console (/api/ras/) proxy to it.
+  # Publish the bastion control port (2222) + the reverse-tunnel range (22000-22003) — on a
+  # home server these must be forwarded through your router; on a VPS just open them.
+  ras:
+    image: ${OTA_CE_NS:?set OTA_CE_NS to your image namespace}/ras:${OTA_CE_TAG:-latest}
+    restart: always
+    environment:
+      - RAS_BASTION_PUBLIC_HOST=${RAS_PUBLIC_HOST:-ota.ce}
+      - RAS_SSH_USER=${RAS_SSH_USER:-torizon}
+      - RAS_PORT_RANGE_START=22000
+      - RAS_PORT_RANGE_COUNT=4
+    expose:
+      - '9080'
+    ports:
+      - '2222:2222'
+      - '22000-22003:22000-22003'
+    volumes:
+      - ras-data:/data
+
 volumes:
   ota-db:
   objects:
+  ras-data:

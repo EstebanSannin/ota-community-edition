@@ -111,6 +111,24 @@ services:
       - ./ota-ce-gen:/gen:ro
       - ./scripts/certs:/certs:ro
 
+  # Remote access server (RAC-compatible reverse-SSH). Optional — see remote-access/README.md.
+  # Built from source here; set RAS_PUBLIC_HOST to the hostname devices+operators reach.
+  ras:
+    build: ./remote-access/ras
+    restart: always
+    environment:
+      - RAS_BASTION_PUBLIC_HOST=${RAS_PUBLIC_HOST:-ota.ce}
+      - RAS_SSH_USER=${RAS_SSH_USER:-torizon}
+      - RAS_PORT_RANGE_START=22000
+      - RAS_PORT_RANGE_COUNT=4
+    expose:
+      - '9080'
+    ports:
+      - '2222:2222'
+      - '22000-22003:22000-22003'
+    volumes:
+      - ras-data:/data
+
   # Kafka and Zookeeper are optional when using test message bus mode
   # Uncomment these if you need Kafka for production message bus
   # zookeeper:
@@ -130,3 +148,4 @@ services:
 volumes:
   ota-db:
   objects:
+  ras-data:
