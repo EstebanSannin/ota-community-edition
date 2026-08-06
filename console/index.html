@@ -141,6 +141,10 @@ pre.code{margin:0;padding:14px 16px;background:#0a1119;color:#d6e2f0;font-family
 .md{font-size:13.5px;line-height:1.6} .md h4{font-size:15px;margin:.6em 0 .3em} .md h5{font-size:13.5px;margin:.6em 0 .3em} .md p{margin:.5em 0} .md ul,.md ol{margin:.4em 0;padding-left:22px} .md li{margin:.15em 0} .md code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:1px 5px;border-radius:5px} .md a{color:var(--accent)} .md pre.code{margin:.5em 0}
 .cmd{font-family:var(--mono);font-size:12.5px;background:#0a1119;color:#d6e2f0;border-color:#1d2a3a;white-space:pre-wrap;word-break:break-all}
 .toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:11px 18px;border-radius:10px;font-weight:600;font-size:13px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:60} .toast.show{opacity:1;transform:translate(-50%,0)}
+.keyrow{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;margin-top:8px;background:var(--surface-2)}
+.keyrow .kt{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px;background:var(--accent-weak);color:var(--accent);text-transform:uppercase}
+.keyrow .ki{flex:1;min-width:0} .keyrow .kc{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .keyrow .kf{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.keyrow .krm{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);display:grid;place-items:center;color:var(--text-faint);flex:none} .keyrow .krm:hover{color:var(--bad);border-color:var(--bad)} .keyrow .krm svg{width:15px;height:15px}
 /* ---- device detail ---- */
 .back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;text-decoration:none;margin-bottom:16px;cursor:pointer} .back:hover{color:var(--text)} .back svg{width:16px;height:16px}
 .dhdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
@@ -253,14 +257,10 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
 
       <section class="view" id="v-remote">
         <div class="cards" style="grid-template-columns:1fr 1fr;align-items:start">
-          <div class="card"><header><h2>Your SSH keys</h2></header>
+          <div class="card"><header><h2>Your SSH keys</h2><span class="grow"></span><button class="btn sm primary" onclick="addOpKey()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add key</button></header>
             <div class="form">
-              <div><label><span class="l">Public keys — one per line; all are authorized on the device for each session (add a friend's key on its own line)</span>
-                <textarea id="ra-key" rows="4" placeholder="ssh-ed25519 AAAA… you@laptop&#10;ssh-ed25519 AAAA… friend@host" oninput="raKeyDirty()"></textarea></label></div>
-              <div style="display:flex;gap:10px;align-items:center">
-                <button class="btn primary" id="ra-key-save" onclick="saveOpKey()">Save key</button>
-                <span class="muted" id="ra-key-msg" style="font-size:12.5px"></span>
-              </div>
+              <p class="muted" style="font-size:12.5px;margin:0">Every saved key is authorized on the device for each remote-access session. Add a friend's key so they can connect too.</p>
+              <div id="ra-key-list"></div>
             </div>
           </div>
           <div class="card"><header><h2>Default tunnel duration</h2></header>
@@ -448,12 +448,52 @@ function showRemoteModal(r){
 }
 // ---------- Remote Access section (left-nav) ----------
 function renderRemote(){
-  const keys=(localStorage.getItem('opSshKeys')!==null?localStorage.getItem('opSshKeys'):(localStorage.getItem('opSshPubkey')||''));
-  const kt=document.getElementById('ra-key'); if(kt&&document.activeElement!==kt)kt.value=keys;
-  const n=opKeysList().length;
-  const km=document.getElementById('ra-key-msg'); if(km)km.textContent=n?(n+' key'+(n>1?'s':'')+' saved.'):'No keys yet — paste one or more public keys (one per line).';
+  renderOpKeys();
   const sel=document.getElementById('ra-ttl'); if(sel)sel.value=localStorage.getItem('raTtl')||'1800';
   loadRaSessions();
+}
+function keyMeta(line){
+  const p=(line||'').trim().split(/\s+/);
+  const type=p[0]||''; const b64=p[1]||''; const comment=p.slice(2).join(' ');
+  const label=type.replace(/^ssh-/,'').replace(/^ecdsa-sha2-nistp/,'ecdsa-').replace(/-cert-v01@openssh\.com$/,'');
+  return {type,b64,comment,label};
+}
+async function keyFingerprint(b64){
+  try{
+    if(!b64||!(window.crypto&&crypto.subtle))return '';
+    const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+    const dig=await crypto.subtle.digest('SHA-256',bytes);
+    return 'SHA256:'+btoa(String.fromCharCode.apply(null,new Uint8Array(dig))).replace(/=+$/,'');
+  }catch(e){return '';}
+}
+function renderOpKeys(){
+  const el=document.getElementById('ra-key-list'); if(!el)return;
+  const keys=opKeysList();
+  if(!keys.length){el.innerHTML='<div class="empty" style="padding:18px 12px">No keys yet. Click <b>Add key</b> to authorize your SSH public key.</div>';return;}
+  el.innerHTML=keys.map((k,i)=>{
+    const m=keyMeta(k);
+    return `<div class="keyrow"><span class="kt">${esc(m.label||'key')}</span>`
+      +`<div class="ki"><div class="kc">${esc(m.comment||'(no comment)')}</div><div class="kf mono muted" id="ra-fp-${i}">${esc(m.b64.slice(0,22))}…</div></div>`
+      +`<button class="krm" title="Remove key" onclick="removeOpKey(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+  }).join('');
+  keys.forEach((k,i)=>{keyFingerprint(keyMeta(k).b64).then(fp=>{const e=document.getElementById('ra-fp-'+i);if(e&&fp)e.textContent=fp;});});
+}
+async function addOpKey(){
+  const raw=((await uiPrompt({title:'Add an SSH public key',label:'Paste a PUBLIC key. It will be authorized on the device for every remote-access session. You can paste several at once (one per line).',placeholder:'ssh-ed25519 AAAA… you@laptop',ok:'Add key',multiline:true}))||'').trim();
+  if(!raw)return;
+  const lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const bad=lines.find(l=>!/^(ssh-(ed25519|rsa|ecdsa)|ecdsa-sha2-)\S*\s+\S/.test(l));
+  if(bad)return toast('Not an SSH public key: '+bad.slice(0,24)+'…');
+  const cur=opKeysList(); let added=0;
+  lines.forEach(l=>{if(!cur.includes(l)){cur.push(l);added++;}});
+  localStorage.setItem('opSshKeys',cur.join('\n')); renderOpKeys();
+  toast(added?('Key added — '+cur.length+' authorized'):'Already saved');
+}
+async function removeOpKey(i){
+  const cur=opKeysList(); if(i<0||i>=cur.length)return;
+  const m=keyMeta(cur[i]);
+  if(!(await uiConfirm({title:'Remove key',message:'Remove '+(m.comment||m.label||'this key')+'? It won\'t be authorized on new sessions.',ok:'Remove',danger:true})))return;
+  cur.splice(i,1); localStorage.setItem('opSshKeys',cur.join('\n')); renderOpKeys(); toast('Key removed');
 }
 async function loadRaSessions(){
   const el=document.getElementById('ra-sessions'); if(!el)return;
@@ -469,12 +509,6 @@ async function loadRaSessions(){
     return `<tr><td><div class="dev"><span class="av" style="width:28px;height:28px;border-radius:7px">${avatar}</span><div class="nm">${esc(nm)}</div></div></td><td class="mono">${esc(String(s.reverse_port))}</td><td class="muted">${esc(exp)}</td><td class="right"><button class="btn sm danger" onclick="killSession('${esc(s.uuid)}')">Kill</button></td></tr>`;
   }).join('')}</tbody></table>`;
 }
-function raKeyDirty(){const m=document.getElementById('ra-key-msg');if(m)m.textContent='Unsaved changes…';}
-function saveOpKey(){const v=(document.getElementById('ra-key').value||'');const m=document.getElementById('ra-key-msg');
-  const lines=v.split(/\n+/).map(x=>x.trim()).filter(Boolean);
-  const bad=lines.find(l=>!/^ssh-(ed25519|rsa|ecdsa)\b/.test(l));
-  if(bad){if(m)m.textContent='Not an SSH public key: '+bad.slice(0,24)+'…';return;}
-  localStorage.setItem('opSshKeys',lines.join('\n'));if(m)m.textContent=lines.length?(lines.length+' key'+(lines.length>1?'s':'')+' saved.'):'Cleared.';toast('Keys saved');}
 function saveTtl(){const v=document.getElementById('ra-ttl').value;localStorage.setItem('raTtl',v);toast('Default duration saved');}
 async function killSession(uuid){
   if(!(await uiConfirm({title:'Kill session?',message:'Stop the remote-access tunnel for this device now?',ok:'Kill',danger:true})))return;
