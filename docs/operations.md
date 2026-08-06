@@ -154,3 +154,26 @@ docker volume ls | grep ota-community-edition
 ```
 
 Copy those tarballs off the box (e.g. `scp` to your laptop) and keep them safe.
+
+## 8. The System page (in-console observability)
+
+The console has a **System** section (left nav) showing service status, CPU/memory/disk,
+and **live logs** per service — no SSH needed. It's powered by an optional overlay
+(`compose.observability.yaml`): a read-only `docker-socket-proxy` (GET-only) plus a small
+`ops` sidecar. The `ops` service never touches the raw Docker socket.
+
+Enable it by adding the third compose file to your deploy:
+
+```bash
+cd /opt/ota-community-edition
+docker build -t "$OTA_CE_NS/ota-ce-ops:$OTA_CE_TAG" ops
+docker compose -f compose.release.yaml -f compose.public.yaml -f compose.observability.yaml \
+  --env-file .env up -d
+```
+
+> Whenever you enable the overlay, keep the `-f compose.observability.yaml` in your deploy
+> commands. If you run `up -d --remove-orphans` with only the release + public files, Compose
+> will remove `ops` and `socket-proxy`. (Plain `up -d` without `--remove-orphans` leaves them.)
+
+Everything the System page shows is also available from the CLI (sections 1–4 above); the page
+is just a convenience layer over the same Docker data.
