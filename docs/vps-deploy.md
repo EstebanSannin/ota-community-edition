@@ -12,12 +12,14 @@ for the multi-tenant / GitHub-login roadmap.
 - A **domain** (or subdomain) you control, e.g. `ota.example.com`, with an **A record → the VPS IP**.
   Used for the console (real HTTPS cert) and the SSH bastion.
 
-## 1. Hostnames (two names, on purpose)
-- **`ota.example.com`** (your real domain): the **console** (Caddy TLS + password) and the **SSH
-  bastion** (devices + your laptop reach it here). Public DNS → VPS.
-- **`ota.ce`**: the **device mTLS gateway only**. It uses a self-signed cert trusted via the device's
-  CA (`root.crt`), so each device maps `ota.ce → <VPS public IP>` in `/etc/hosts`. (Keeping `ota.ce`
-  for the gateway avoids re-issuing its cert; unifying on the real domain is a later nicety.)
+## 1. One hostname
+Everything uses your real domain **`ota.example.com`** (public DNS → VPS):
+- **console** — Caddy TLS + password.
+- **device mTLS gateway** (`:30443`) — the gateway cert is issued (by the instance CA) with your
+  domain as a SAN, so devices verify it over normal DNS. **No `/etc/hosts` on devices.**
+- **SSH bastion** — devices + your laptop reach it here.
+
+(The internal placeholder `ota.ce` is still a SAN for backward-compat, but nothing needs it.)
 
 ## 2. Firewall (ufw) — only these ports public
 ```bash
@@ -70,20 +72,24 @@ docker compose -f compose.release.yaml -f compose.public.yaml up -d   # add Cadd
 Visit `https://ota.example.com` → browser asks for the shared password → the console.
 
 ## 7. Provision a device (per device)
-On the device, add the gateway host mapping and run the provisioner script (served by the console,
-so pass the password), then drop in the remote-access config:
+Open the console → **Provision device**: it generates a **short-lived enrollment token** and shows a
+copy-ready command (tick **"install the hardware reporter"** for the full device view). Run it on the
+device **as root** — no `/etc/hosts`, nothing to pre-install:
 ```bash
-echo "<VPS_public_IP> ota.ce" | sudo tee -a /etc/hosts
-curl -u admin:'the-shared-password' https://ota.example.com/provision-device.sh | sudo bash -s -- -n my-device
-sudo cp remote-access/client.toml.example /etc/rac/client.toml   # then edit RAS_PUBLIC_HOST/certs; see remote-access/README.md
+curl -fsSL https://ota.example.com/provision-device.sh | sudo bash -s -- \
+  -s https://ota.example.com -n my-device -t <token-from-the-dialog> -r
+```
+For remote access, drop in the RAC config (edit the gateway host to your domain) and start it:
+```bash
+sudo cp remote-access/client.toml.example /etc/rac/client.toml   # see remote-access/README.md
 sudo systemctl restart rac aktualizr-torizon
 ```
 
 ## 8. Use it
 - **Console** (you + friends): `https://ota.example.com` with the shared password.
+- **Provisioning**: each operator generates their own short-lived token in the Provision dialog.
 - **Remote access**: device page → Remote Access → the `ssh` command targets `ota.example.com`.
-- **Devices**: talk to the gateway at `ota.ce:30443` (their `/etc/hosts` → VPS IP) and the bastion at
-  `ota.example.com:2222`.
+- **Devices**: gateway `ota.example.com:30443` (mTLS) + bastion `ota.example.com:2222` — all real DNS.
 
 ## Security notes
 - The shared password protects the **console + its API**. Devices (mTLS) and the bastion (SSH keys)
