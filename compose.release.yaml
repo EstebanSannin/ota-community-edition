@@ -104,7 +104,11 @@ services:
       - GATEWAY_URL=https://ota.ce:30443
       - DEVICE_REGISTRY_URL=http://ota-lith:7300/device-registry/api/v1/devices
       - NAMESPACE=default
-      - PROVISION_TOKEN=${PROVISION_TOKEN:-}   # set on a public instance so enrolling needs a token
+      # Enrollment tokens: leave PROVISION_TOKEN empty and set PROVISION_REQUIRE_TOKEN=1 to require
+      # short-lived tokens the operator mints from the console (recommended for a public instance).
+      - PROVISION_TOKEN=${PROVISION_TOKEN:-}
+      - PROVISION_REQUIRE_TOKEN=${PROVISION_REQUIRE_TOKEN:-}
+      - PROVISION_TOKEN_TTL=${PROVISION_TOKEN_TTL:-3600}
     volumes:
       - ./ota-ce-gen:/gen:ro
       - ./scripts/certs:/certs:ro

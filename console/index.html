@@ -285,7 +285,11 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
     <header><h3>Provision a device</h3><span class="spacer"></span><button class="iconbtn" onclick="closeProvision()" style="width:32px;height:32px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
     <div class="form">
       <div><label><span class="l">Device name (optional)</span><input id="provName" placeholder="my-device-01" oninput="renderProvCmd()"></label></div>
-      <div><label><span class="l">Provisioning token (only if the server requires one)</span><input id="provToken" placeholder="leave empty unless PROVISION_TOKEN is set" oninput="renderProvCmd()"></label></div>
+      <div><label><span class="l">Provisioning token <span id="provTokNote" class="muted" style="font-weight:400;text-transform:none;letter-spacing:0"></span></span>
+        <div style="display:flex;gap:8px">
+          <input id="provToken" placeholder="click Generate" oninput="renderProvCmd()" style="flex:1">
+          <button type="button" class="btn sm" id="provGenBtn" onclick="generateProvToken()">Generate</button>
+        </div></label></div>
       <div><span class="lbl2">Run this on the device as root</span><textarea id="provCmd" class="cmd" rows="3" readonly onclick="this.select()"></textarea></div>
       <button class="btn primary" onclick="copyProvCmd()" style="align-self:start">⧉ Copy command</button>
       <div class="msg" id="provMsg"></div>
@@ -969,7 +973,18 @@ async function editPkgDescription(){const p=PKGCUR;if(!p||p.source!=='mine')retu
     p.description=v.trim();await loadTargets();renderPkgDetail(null);toast('Description saved');}catch(e){toast('Save failed: '+e.message);}}
 
 // ---------- provisioning ----------
-function openProvision(){document.getElementById('provModal').classList.add('open');renderProvCmd();}
+function openProvision(){document.getElementById('provModal').classList.add('open');renderProvCmd();generateProvToken();}
+async function generateProvToken(){
+  const tf=document.getElementById('provToken'),note=document.getElementById('provTokNote'),btn=document.getElementById('provGenBtn');
+  if(btn)btn.disabled=true; if(note)note.textContent='· generating…';
+  try{
+    const r=await api('/api/provision-tokens',{method:'POST'});
+    const o=(typeof r==='object'&&r)?r:JSON.parse(r);
+    tf.value=o.token||''; renderProvCmd();
+    if(note)note.textContent=o.ttl_secs?('· short-lived, expires in '+Math.max(1,Math.round(o.ttl_secs/60))+' min'):'';
+  }catch(e){ if(note)note.textContent='· couldn’t generate (open provisioning, or service unavailable)'; }
+  finally{ if(btn)btn.disabled=false; }
+}
 function closeProvision(){document.getElementById('provModal').classList.remove('open');}
 function renderProvCmd(){const name=(document.getElementById('provName').value||'').trim().replace(/[^A-Za-z0-9_-]/g,'');const tok=(document.getElementById('provToken').value||'').trim();const o=location.origin,n=name?(' -n '+name):'',t=tok?(' -t '+tok):'';document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}${t}`;}
 function copyProvCmd(){const t=document.getElementById('provCmd');navigator.clipboard.writeText(t.value).then(()=>showMsg(document.getElementById('provMsg'),'ok','Copied — paste into a root shell on the device.')).catch(()=>{t.select();document.execCommand('copy');});}

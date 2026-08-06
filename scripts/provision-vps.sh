@@ -62,22 +62,21 @@ else
 fi
 cd "$APP_DIR"
 
-say "5/8  build the ras image ($OTA_CE_NS/ras:$OTA_CE_TAG)"
+say "5/8  build local images (ras + provisioner)"
 docker build -t "$OTA_CE_NS/ras:$OTA_CE_TAG" remote-access/ras
+docker build -t "$OTA_CE_NS/ota-ce-provisioner:$OTA_CE_TAG" provisioner
 
 say "6/8  .env + Caddyfile"
-# Provisioning token: reuse the existing one if present, else generate + persist (so re-runs are stable).
-EXISTING_TOKEN="$( (grep -E '^PROVISION_TOKEN=' "$APP_DIR/.env" 2>/dev/null || true) | cut -d= -f2 || true)"
-PROVISION_TOKEN="${PROVISION_TOKEN:-$EXISTING_TOKEN}"
-[ -n "$PROVISION_TOKEN" ] || PROVISION_TOKEN="$(openssl rand -hex 12)"
-# .env drives compose ${} substitution for the release stack (simple values, no '$').
+# Enrollment is gated by SHORT-LIVED tokens the operator mints from the console — no static shared
+# secret. PROVISION_REQUIRE_TOKEN=1 makes the provisioner require a (minted) token to enroll.
 cat > "$APP_DIR/.env" <<EOF
 OTA_CE_NS=$OTA_CE_NS
 OTA_CE_TAG=$OTA_CE_TAG
 RAS_PUBLIC_HOST=$RAS_PUBLIC_HOST
 RAS_SSH_USER=$RAS_SSH_USER
 CONSOLE_BIND=127.0.0.1
-PROVISION_TOKEN=$PROVISION_TOKEN
+PROVISION_REQUIRE_TOKEN=1
+PROVISION_TOKEN_TTL=3600
 EOF
 # Render the Caddyfile with values inlined (incl. the bcrypt hash) — no env-var indirection, so
 # compose's interpolation can't mangle the hash's '$' chars. Only when a hash is provided.
@@ -113,9 +112,10 @@ FILES=(-f compose.release.yaml)
 # `up` uses the locally-built ras and pulls only the missing images (no blanket pull that would
 # choke on ras). --env-file makes the vars available for substitution.
 docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d
-# compose doesn't detect Caddyfile *content* changes (bind mount), so force-recreate caddy to
-# pick up a re-rendered config (e.g. after changing RAS_PUBLIC_HOST / the password).
-[ -n "$CONSOLE_PASSWORD_HASH" ] && docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d --force-recreate caddy
+# compose doesn't detect bind-mount *content* changes (Caddyfile, console nginx.conf/index.html),
+# so force-recreate the proxies to pick up re-rendered/updated config on a re-run.
+RECREATE=(console); [ -n "$CONSOLE_PASSWORD_HASH" ] && RECREATE+=(caddy)
+docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d --force-recreate "${RECREATE[@]}"
 echo "   waiting for ota-lith to become healthy…"
 for _ in $(seq 1 100); do
   s=$(docker inspect -f '{{.State.Health.Status}}' "${PROJECT}-ota-lith-1" 2>/dev/null || echo starting)
@@ -139,10 +139,9 @@ cat <<EOF
 
   ── access ─────────────────────────────────────────────────────────────
   Console      https://$RAS_PUBLIC_HOST        (login: $CONSOLE_USER / <your password>)
-  Provision    on the device, map the gateway host then enroll with the token:
-     echo "<THIS_VPS_IP> ota.ce" | sudo tee -a /etc/hosts
-     curl -fsSL https://$RAS_PUBLIC_HOST/provision-device.sh | sudo bash -s -- \\
-          -s https://$RAS_PUBLIC_HOST -n <device-name> -t $PROVISION_TOKEN
+  Provision    open the console → "Provision device" — a SHORT-LIVED token is generated for you;
+               copy the shown command and run it on the device (first map the gateway host:
+               echo "<THIS_VPS_IP> ota.ce" | sudo tee -a /etc/hosts).
   Remote SSH   device page → "Remote access"; bastion = $RAS_PUBLIC_HOST
   ────────────────────────────────────────────────────────────────────────
 EOF
