@@ -100,6 +100,9 @@ FILES=(-f compose.release.yaml)
 # `up` uses the locally-built ras and pulls only the missing images (no blanket pull that would
 # choke on ras). --env-file makes the vars available for substitution.
 docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d
+# compose doesn't detect Caddyfile *content* changes (bind mount), so force-recreate caddy to
+# pick up a re-rendered config (e.g. after changing RAS_PUBLIC_HOST / the password).
+[ -n "$CONSOLE_PASSWORD_HASH" ] && docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d --force-recreate caddy
 echo "   waiting for ota-lith to become healthy…"
 for _ in $(seq 1 100); do
   s=$(docker inspect -f '{{.State.Health.Status}}' "${PROJECT}-ota-lith-1" 2>/dev/null || echo starting)
