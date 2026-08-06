@@ -101,7 +101,7 @@ services:
     depends_on:
       - ota-lith
     environment:
-      - GATEWAY_URL=https://ota.ce:30443
+      - GATEWAY_URL=${GATEWAY_URL:-https://ota.ce:30443}
       - DEVICE_REGISTRY_URL=http://ota-lith:7300/device-registry/api/v1/devices
       - NAMESPACE=default
       # Enrollment tokens: leave PROVISION_TOKEN empty and set PROVISION_REQUIRE_TOKEN=1 to require

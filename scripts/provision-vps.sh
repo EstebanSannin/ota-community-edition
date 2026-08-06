@@ -75,6 +75,7 @@ OTA_CE_TAG=$OTA_CE_TAG
 RAS_PUBLIC_HOST=$RAS_PUBLIC_HOST
 RAS_SSH_USER=$RAS_SSH_USER
 CONSOLE_BIND=127.0.0.1
+GATEWAY_URL=https://$RAS_PUBLIC_HOST:30443
 PROVISION_REQUIRE_TOKEN=1
 PROVISION_TOKEN_TTL=3600
 EOF
@@ -106,7 +107,14 @@ EOF
 fi
 
 say "7/8  certs + bring up the stack"
-[ -d ota-ce-gen ] || scripts/gen-server-certs.sh
+# The gateway cert must cover RAS_PUBLIC_HOST so devices reach the gateway by real DNS (no
+# /etc/hosts ota.ce hack). Regenerate if it's missing that SAN — this re-issues the device CA,
+# which is fine before any device has enrolled.
+if [ -d ota-ce-gen ] && ! openssl x509 -in ota-ce-gen/server.crt -noout -text 2>/dev/null | grep -q "DNS:$RAS_PUBLIC_HOST"; then
+  echo "   gateway cert lacks SAN $RAS_PUBLIC_HOST — regenerating certs"
+  rm -rf ota-ce-gen
+fi
+[ -d ota-ce-gen ] || GATEWAY_ALT_NAMES="$RAS_PUBLIC_HOST" scripts/gen-server-certs.sh
 FILES=(-f compose.release.yaml)
 [ -n "$CONSOLE_PASSWORD_HASH" ] && FILES+=(-f compose.public.yaml)
 # `up` uses the locally-built ras and pulls only the missing images (no blanket pull that would
@@ -114,7 +122,7 @@ FILES=(-f compose.release.yaml)
 docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d
 # compose doesn't detect bind-mount *content* changes (Caddyfile, console nginx.conf/index.html),
 # so force-recreate the proxies to pick up re-rendered/updated config on a re-run.
-RECREATE=(console); [ -n "$CONSOLE_PASSWORD_HASH" ] && RECREATE+=(caddy)
+RECREATE=(console gateway provisioner); [ -n "$CONSOLE_PASSWORD_HASH" ] && RECREATE+=(caddy)
 docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d --force-recreate "${RECREATE[@]}"
 echo "   waiting for ota-lith to become healthy…"
 for _ in $(seq 1 100); do
