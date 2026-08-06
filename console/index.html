@@ -188,6 +188,7 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
       <a data-view="devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Devices<span class="badge" id="nav-dev">0</span></a>
       <div class="lbl">Software</div>
       <a data-view="packages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>Packages<span class="badge" id="nav-tgt">0</span></a>
+      <a data-view="remote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>Remote Access<span class="badge" id="nav-ra">0</span></a>
       <a href="apidocs/" target="_blank" rel="noopener" title="Open the API reference in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M9 9h.01M12 9h.01M8 13h8"/></svg>API<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;margin-left:auto;opacity:.6"><path d="M14 3h7v7M21 3l-9 9M5 5h5M5 5v14h14v-5"/></svg></a>
     </nav>
     <div class="foot"><span class="dot" id="dot"></span> <span id="status">connecting…</span></div>
@@ -249,6 +250,32 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
       </section>
 
       <section class="view" id="v-package"><div id="pkgDetail"></div></section>
+
+      <section class="view" id="v-remote">
+        <div class="cards" style="grid-template-columns:1fr 1fr;align-items:start">
+          <div class="card"><header><h2>Your SSH key</h2></header>
+            <div class="form">
+              <div><label><span class="l">Public key — authorized on the device for each session (never your private key)</span>
+                <textarea id="ra-key" rows="3" placeholder="ssh-ed25519 AAAA… you@laptop" oninput="raKeyDirty()"></textarea></label></div>
+              <div style="display:flex;gap:10px;align-items:center">
+                <button class="btn primary" id="ra-key-save" onclick="saveOpKey()">Save key</button>
+                <span class="muted" id="ra-key-msg" style="font-size:12.5px"></span>
+              </div>
+            </div>
+          </div>
+          <div class="card"><header><h2>Default tunnel duration</h2></header>
+            <div class="form">
+              <div><label><span class="l">New sessions auto-expire (killed server-side) after</span>
+                <select id="ra-ttl" onchange="saveTtl()"><option value="900">15 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="14400">4 hours</option><option value="28800">8 hours</option></select></label></div>
+              <p class="muted" style="font-size:12.5px;margin:0">The server enforces this — the tunnel drops automatically when it expires, even if you forget to stop it.</p>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:12px"><header><h2>Active sessions</h2><span class="count" id="ra-count">0</span><span class="grow"></span>
+          <button class="btn sm" onclick="renderRemote()">Refresh</button></header>
+          <div class="tablewrap" id="ra-sessions"><div class="empty">Loading…</div></div>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -286,11 +313,12 @@ let SOURCES=[], PKGCOUNTS={}, PKGSRC='mine', PKGHW=null, PKGVIEW=[], pkgGridSeq=
 let PKGLAYOUT=(localStorage.getItem('pkgLayout')||'grid'), PKGSORT=(localStorage.getItem('pkgSort')||'date');
 let SEL=new Set(), FTAGS=new Set();   // selected device uuids + active tag filters
 
-const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Your packages and the feeds you subscribe to'],package:['Package','Package detail']};
+const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Your packages and the feeds you subscribe to'],package:['Package','Package detail'],remote:['Remote Access','Your SSH key, tunnel duration, and active sessions']};
 function go(v){document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
   const tt2=TITLES[v]||TITLES.devices;document.getElementById('ptitle').textContent=tt2[0];document.getElementById('psub').textContent=tt2[1];window.scrollTo(0,0);
-  if(v==='packages')renderPackages();}
+  if(v==='packages')renderPackages();
+  if(v==='remote')renderRemote();}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-view]');if(a){e.preventDefault();go(a.dataset.view);}});
 function toggleTheme(){const r=document.documentElement;const cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',cur==='dark'?'light':'dark');}
 
@@ -383,8 +411,9 @@ async function remoteAccess(){
     localStorage.setItem('opSshPubkey',opkey);
   }
   toast('Arming remote access…');
+  const ttl=Number(localStorage.getItem('raTtl')||1800);
   try{
-    const r=await api('/api/ras/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uuid,operator_pubkey:opkey,ttl_secs:1800})});
+    const r=await api('/api/ras/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uuid,operator_pubkey:opkey,ttl_secs:ttl})});
     showRemoteModal(typeof r==='object'?r:JSON.parse(r));
   }catch(e){toast('Remote access unavailable — is the ras service deployed? ('+(e.message||e)+')');}
 }
@@ -409,6 +438,38 @@ function showRemoteModal(r){
   ov.querySelector('.mok').onclick=()=>ov.remove();
   ov.addEventListener('mousedown',e=>{if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
+}
+// ---------- Remote Access section (left-nav) ----------
+function renderRemote(){
+  const key=localStorage.getItem('opSshPubkey')||'';
+  const kt=document.getElementById('ra-key'); if(kt&&document.activeElement!==kt)kt.value=key;
+  const km=document.getElementById('ra-key-msg'); if(km)km.textContent=key?'Saved.':'No key set yet — paste your SSH public key.';
+  const sel=document.getElementById('ra-ttl'); if(sel)sel.value=localStorage.getItem('raTtl')||'1800';
+  loadRaSessions();
+}
+async function loadRaSessions(){
+  const el=document.getElementById('ra-sessions'); if(!el)return;
+  let vals=[];
+  try{const r=await api('/api/ras/sessions'); vals=(r&&r.values)||[];}
+  catch(e){el.innerHTML='<div class="empty">Remote-access service not reachable — is the <span class="mono">ras</span> service deployed?</div>';const c=document.getElementById('ra-count');if(c)c.textContent='0';const n=document.getElementById('nav-ra');if(n)n.textContent='0';return;}
+  const c=document.getElementById('ra-count');if(c)c.textContent=vals.length;
+  const n=document.getElementById('nav-ra');if(n)n.textContent=vals.length;
+  if(!vals.length){el.innerHTML='<div class="empty">No active sessions. Open a device and click “Remote access”.</div>';return;}
+  el.innerHTML=`<table><thead><tr><th>Device</th><th>Reverse port</th><th>Expires</th><th class="right">Action</th></tr></thead><tbody>${vals.map(s=>{
+    const d=DEVICES.find(x=>x.uuid===s.uuid);const nm=d?(d.deviceName||d.deviceId):s.uuid;
+    const exp=s.expires_at?relTime(s.expires_at).replace(' ago',' left'):'—';
+    return `<tr><td><div class="dev"><span class="av" style="width:28px;height:28px;border-radius:7px">${avatar}</span><div class="nm">${esc(nm)}</div></div></td><td class="mono">${esc(String(s.reverse_port))}</td><td class="muted">${esc(exp)}</td><td class="right"><button class="btn sm danger" onclick="killSession('${esc(s.uuid)}')">Kill</button></td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+function raKeyDirty(){const m=document.getElementById('ra-key-msg');if(m)m.textContent='Unsaved changes…';}
+function saveOpKey(){const v=(document.getElementById('ra-key').value||'').trim();const m=document.getElementById('ra-key-msg');
+  if(v&&!/^ssh-(ed25519|rsa|ecdsa)\b/.test(v)){if(m)m.textContent='That doesn’t look like an SSH public key.';return;}
+  localStorage.setItem('opSshPubkey',v);if(m)m.textContent=v?'Saved.':'Cleared.';toast(v?'SSH key saved':'SSH key cleared');}
+function saveTtl(){const v=document.getElementById('ra-ttl').value;localStorage.setItem('raTtl',v);toast('Default duration saved');}
+async function killSession(uuid){
+  if(!(await uiConfirm({title:'Kill session?',message:'Stop the remote-access tunnel for this device now?',ok:'Kill',danger:true})))return;
+  try{await api('/api/ras/sessions/'+encodeURIComponent(uuid),{method:'DELETE'});toast('Session killed');}catch(e){toast('Kill failed: '+(e.message||e));}
+  renderRemote();
 }
 
 // ---------- device detail ----------
@@ -918,4 +979,5 @@ async function refreshAll(){try{await Promise.all([loadDevices(),loadTargets(),l
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProvision();});
 refreshAll();
 setInterval(()=>{if(document.getElementById('v-device').classList.contains('active'))return;loadDevices();},8000);
+setInterval(()=>{if(document.getElementById('v-remote').classList.contains('active'))loadRaSessions();},5000);
 </script>
