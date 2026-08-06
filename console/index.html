@@ -253,10 +253,10 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
 
       <section class="view" id="v-remote">
         <div class="cards" style="grid-template-columns:1fr 1fr;align-items:start">
-          <div class="card"><header><h2>Your SSH key</h2></header>
+          <div class="card"><header><h2>Your SSH keys</h2></header>
             <div class="form">
-              <div><label><span class="l">Public key — authorized on the device for each session (never your private key)</span>
-                <textarea id="ra-key" rows="3" placeholder="ssh-ed25519 AAAA… you@laptop" oninput="raKeyDirty()"></textarea></label></div>
+              <div><label><span class="l">Public keys — one per line; all are authorized on the device for each session (add a friend's key on its own line)</span>
+                <textarea id="ra-key" rows="4" placeholder="ssh-ed25519 AAAA… you@laptop&#10;ssh-ed25519 AAAA… friend@host" oninput="raKeyDirty()"></textarea></label></div>
               <div style="display:flex;gap:10px;align-items:center">
                 <button class="btn primary" id="ra-key-save" onclick="saveOpKey()">Save key</button>
                 <span class="muted" id="ra-key-msg" style="font-size:12.5px"></span>
@@ -408,18 +408,19 @@ async function confirmDelete(uuids){
 async function deleteCurrentDevice(){const u=CUR&&CUR.uuid;if(!u)return;await confirmDelete([u]);if(!DEVICES.some(d=>d.uuid===u))go('devices');}
 
 // ---------- remote access (RAC reverse-SSH via ras) ----------
+function opKeysList(){let s=localStorage.getItem('opSshKeys');if(s===null)s=localStorage.getItem('opSshPubkey')||'';return s.split(/\n+/).map(x=>x.trim()).filter(Boolean);}
 async function remoteAccess(){
   const uuid=CUR&&CUR.uuid; if(!uuid)return;
-  let opkey=(localStorage.getItem('opSshPubkey')||'').trim();
-  if(!opkey){
-    opkey=((await uiPrompt({title:'Your SSH public key',label:'Paste your PUBLIC key — it will be authorized on the device for this session',placeholder:'ssh-ed25519 AAAA… you@laptop',ok:'Save & continue'}))||'').trim();
-    if(!opkey)return;
-    localStorage.setItem('opSshPubkey',opkey);
+  let keys=opKeysList();
+  if(!keys.length){
+    const k=((await uiPrompt({title:'Your SSH public key',label:'Paste your PUBLIC key — it will be authorized on the device for this session',placeholder:'ssh-ed25519 AAAA… you@laptop',ok:'Save & continue'}))||'').trim();
+    if(!k)return;
+    localStorage.setItem('opSshKeys',k); keys=[k];
   }
   toast('Arming remote access…');
   const ttl=Number(localStorage.getItem('raTtl')||1800);
   try{
-    const r=await api('/api/ras/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uuid,operator_pubkey:opkey,ttl_secs:ttl})});
+    const r=await api('/api/ras/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uuid,operator_pubkeys:keys,ttl_secs:ttl})});
     showRemoteModal(typeof r==='object'?r:JSON.parse(r));
   }catch(e){toast('Remote access unavailable — is the ras service deployed? ('+(e.message||e)+')');}
 }
@@ -447,9 +448,10 @@ function showRemoteModal(r){
 }
 // ---------- Remote Access section (left-nav) ----------
 function renderRemote(){
-  const key=localStorage.getItem('opSshPubkey')||'';
-  const kt=document.getElementById('ra-key'); if(kt&&document.activeElement!==kt)kt.value=key;
-  const km=document.getElementById('ra-key-msg'); if(km)km.textContent=key?'Saved.':'No key set yet — paste your SSH public key.';
+  const keys=(localStorage.getItem('opSshKeys')!==null?localStorage.getItem('opSshKeys'):(localStorage.getItem('opSshPubkey')||''));
+  const kt=document.getElementById('ra-key'); if(kt&&document.activeElement!==kt)kt.value=keys;
+  const n=opKeysList().length;
+  const km=document.getElementById('ra-key-msg'); if(km)km.textContent=n?(n+' key'+(n>1?'s':'')+' saved.'):'No keys yet — paste one or more public keys (one per line).';
   const sel=document.getElementById('ra-ttl'); if(sel)sel.value=localStorage.getItem('raTtl')||'1800';
   loadRaSessions();
 }
@@ -468,9 +470,11 @@ async function loadRaSessions(){
   }).join('')}</tbody></table>`;
 }
 function raKeyDirty(){const m=document.getElementById('ra-key-msg');if(m)m.textContent='Unsaved changes…';}
-function saveOpKey(){const v=(document.getElementById('ra-key').value||'').trim();const m=document.getElementById('ra-key-msg');
-  if(v&&!/^ssh-(ed25519|rsa|ecdsa)\b/.test(v)){if(m)m.textContent='That doesn’t look like an SSH public key.';return;}
-  localStorage.setItem('opSshPubkey',v);if(m)m.textContent=v?'Saved.':'Cleared.';toast(v?'SSH key saved':'SSH key cleared');}
+function saveOpKey(){const v=(document.getElementById('ra-key').value||'');const m=document.getElementById('ra-key-msg');
+  const lines=v.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const bad=lines.find(l=>!/^ssh-(ed25519|rsa|ecdsa)\b/.test(l));
+  if(bad){if(m)m.textContent='Not an SSH public key: '+bad.slice(0,24)+'…';return;}
+  localStorage.setItem('opSshKeys',lines.join('\n'));if(m)m.textContent=lines.length?(lines.length+' key'+(lines.length>1?'s':'')+' saved.'):'Cleared.';toast('Keys saved');}
 function saveTtl(){const v=document.getElementById('ra-ttl').value;localStorage.setItem('raTtl',v);toast('Default duration saved');}
 async function killSession(uuid){
   if(!(await uiConfirm({title:'Kill session?',message:'Stop the remote-access tunnel for this device now?',ok:'Kill',danger:true})))return;

@@ -160,7 +160,7 @@ fn armed_operator_keys(state: &AppState) -> Vec<ssh_key::PublicKey> {
     let mut stmt = db.prepare("SELECT operator_pubkey FROM sessions WHERE expires_at > ?1").unwrap();
     let rows = stmt.query_map([now], |r| r.get::<_, String>(0)).unwrap();
     let mut out = Vec::new();
-    for r in rows.flatten() { if let Ok(k) = r.parse::<ssh_key::PublicKey>() { out.push(k); } }
+    for r in rows.flatten() { for line in r.lines() { if let Ok(k) = line.trim().parse::<ssh_key::PublicKey>() { out.push(k); } } }
     out
 }
 
@@ -178,7 +178,7 @@ struct SshSession {
 #[derive(Serialize, Clone)]
 struct DeviceSession { ssh: SshSession }
 #[derive(Deserialize)]
-struct CreateSession { uuid: String, operator_pubkey: String, #[serde(default)] ttl_secs: Option<i64> }
+struct CreateSession { uuid: String, #[serde(default)] operator_pubkey: Option<String>, #[serde(default)] operator_pubkeys: Option<Vec<String>>, #[serde(default)] ttl_secs: Option<i64> }
 
 fn device_uuid(state: &AppState, headers: &HeaderMap) -> Option<String> {
     if let Some(v) = headers.get(&state.cfg.uuid_header) { if let Ok(s) = v.to_str() { if !s.is_empty() { return Some(s.to_string()); } } }
@@ -208,12 +208,13 @@ fn active_session(st: &AppState, uuid: &str) -> Option<(String, u16, DateTime<Ut
 async fn get_sessions(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let Some(uuid) = device_uuid(&st, &headers) else { return StatusCode::NOT_FOUND.into_response() };
     let Some((op_key, rport, exp)) = active_session(&st, &uuid) else { return StatusCode::NOT_FOUND.into_response() };
-    let Ok(op_pub) = op_key.parse::<ssh_key::PublicKey>() else { return StatusCode::INTERNAL_SERVER_ERROR.into_response() };
+    let pubs: Vec<ssh_key::PublicKey> = op_key.lines().filter_map(|l| l.trim().parse().ok()).collect();
+    if pubs.is_empty() { return StatusCode::INTERNAL_SERVER_ERROR.into_response(); }
     let url = match Url::parse(&format!("ssh://{}@{}:{}", uuid, st.cfg.public_host, st.cfg.bastion_port)) {
         Ok(u) => u, Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
     let ds = DeviceSession { ssh: SshSession {
-        authorized_pubkeys: vec![op_pub], reverse_port: rport, ra_server_url: url,
+        authorized_pubkeys: pubs, reverse_port: rport, ra_server_url: url,
         ra_server_ssh_pubkey: st.bastion_pub.clone(), expires_at: exp,
     }};
     Json(ds).into_response()
@@ -240,14 +241,20 @@ fn alloc_port(st: &AppState) -> Option<u16> {
 }
 
 async fn admin_create_session(State(st): State<Arc<AppState>>, Json(body): Json<CreateSession>) -> Response {
-    if body.operator_pubkey.parse::<ssh_key::PublicKey>().is_err() { return (StatusCode::BAD_REQUEST, "invalid operator_pubkey").into_response(); }
+    // accept operator_pubkeys (list) and/or operator_pubkey (single); authorize all of them
+    let mut keys: Vec<String> = body.operator_pubkeys.unwrap_or_default();
+    if let Some(k) = body.operator_pubkey { keys.push(k); }
+    keys = keys.into_iter().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect();
+    if keys.is_empty() { return (StatusCode::BAD_REQUEST, "no operator key(s) provided").into_response(); }
+    if keys.iter().any(|k| k.parse::<ssh_key::PublicKey>().is_err()) { return (StatusCode::BAD_REQUEST, "invalid operator key").into_response(); }
+    let stored = keys.join("\n");   // multiple keys are newline-joined in the operator_pubkey column
     let ttl = body.ttl_secs.unwrap_or(3600).clamp(60, 86_400);
     let Some(port) = alloc_port(&st) else { return (StatusCode::CONFLICT, "no free tunnel port (max concurrent sessions reached)").into_response() };
     let exp = (Utc::now() + chrono::Duration::seconds(ttl)).to_rfc3339();
     {
         let db = st.db.lock().unwrap();
         let _ = db.execute("INSERT INTO sessions(uuid,operator_pubkey,reverse_port,expires_at) VALUES(?1,?2,?3,?4) ON CONFLICT(uuid) DO UPDATE SET operator_pubkey=?2, reverse_port=?3, expires_at=?4",
-            rusqlite::params![body.uuid, body.operator_pubkey.trim(), port as i64, exp]);
+            rusqlite::params![body.uuid, stored, port as i64, exp]);
     }
     log::info!("armed session for {} on port {}", body.uuid, port);
     Json(json!({
