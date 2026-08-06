@@ -11,8 +11,10 @@ services:
   reverse-proxy:
     image: nginx:1.27
     restart: always
-    ports:
-      - "80:80"
+    # internal only (reached by the gateway via the docker network); never published to the host,
+    # so it can't be hit from the public internet and leaves port 80 free for the Caddy front.
+    expose:
+      - "80"
     depends_on:
       - ota-lith
     volumes:
@@ -27,7 +29,6 @@ services:
       - '443'
       - '8443'
     ports:
-      - '8443'
       - '30443:8443'
     depends_on:
       - ota-lith
@@ -47,8 +48,10 @@ services:
       - --max-connections=10000
       - --character-set-server=utf8
       - --collation-server=utf8_unicode_ci
+    # bound to localhost only — the DB must never be reachable from the public internet
+    # (containers still reach it as `db` over the docker network).
     ports:
-      - '3306:3306'
+      - '127.0.0.1:3306:3306'
     expose:
       - '3306'
     volumes:
@@ -81,8 +84,10 @@ services:
   console:
     image: nginx:1.27
     restart: always
+    # On a public VPS set CONSOLE_BIND=127.0.0.1 so the console is only reachable via the Caddy
+    # TLS+password front (compose.public.yaml); on a LAN it defaults to all interfaces.
     ports:
-      - "8080:80"
+      - "${CONSOLE_BIND:-0.0.0.0}:8080:80"
     depends_on:
       - ota-lith
     volumes:

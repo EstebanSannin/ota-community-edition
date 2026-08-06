@@ -1,0 +1,36 @@
+# Public / VPS overlay — adds a TLS + shared-password front (Caddy) over the console.
+# Use ON TOP of the release compose:
+#
+#   docker compose -f compose.release.yaml -f compose.public.yaml up -d
+#
+# Requires (in your .env or the environment):
+#   RAS_PUBLIC_HOST=ota.example.com        # your VPS domain (DNS A record -> the VPS)
+#   ACME_EMAIL=you@example.com             # for Let's Encrypt
+#   CONSOLE_USER=admin
+#   CONSOLE_PASSWORD_HASH=$(docker run --rm caddy caddy hash-password --plaintext 'your-password')
+#   CONSOLE_BIND=127.0.0.1                 # keep the raw console off the public interface
+#   OTA_CE_NS=... OTA_CE_TAG=...           # (as for compose.release.yaml)
+#
+# See docs/vps-deploy.md for the full runbook (firewall, DNS, provisioning).
+services:
+  caddy:
+    image: caddy:2
+    restart: always
+    depends_on:
+      - console
+    ports:
+      - "80:80"     # ACME HTTP-01 challenge + HTTP->HTTPS redirect
+      - "443:443"
+    environment:
+      - RAS_PUBLIC_HOST=${RAS_PUBLIC_HOST:?set to your VPS domain}
+      - ACME_EMAIL=${ACME_EMAIL:?set to your email for Let's Encrypt}
+      - CONSOLE_USER=${CONSOLE_USER:-admin}
+      - CONSOLE_PASSWORD_HASH=${CONSOLE_PASSWORD_HASH:?generate with: docker run --rm caddy caddy hash-password --plaintext PASS}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:

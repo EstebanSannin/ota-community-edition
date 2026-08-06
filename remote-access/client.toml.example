@@ -1,0 +1,26 @@
+# RAC (Torizon Remote Access Client) config for this OTA CE instance.
+# Copy to /etc/rac/client.toml on the device, then: sudo systemctl restart rac (or aktualizr-torizon).
+#
+# The device reaches the mTLS gateway at ota.ce:30443, so add the gateway host to /etc/hosts:
+#   echo "<VPS_public_IP> ota.ce" | sudo tee -a /etc/hosts
+# The bastion + operator SSH use your real domain (RAS_PUBLIC_HOST), resolved via public DNS.
+[torizon]
+url = "https://ota.ce:30443/ras/"
+# Must be explicit — the default (/director/) would hit the aktualizr director, not ras.
+director_url = "https://ota.ce:30443/ras/director/"
+server_cert_path = "/var/sota/import/root.crt"     # the instance CA (already on provisioned devices)
+client_cert_path = "/var/sota/import/client.pem"   # the device's mTLS cert (CN = device UUID)
+client_key_path  = "/var/sota/import/pkey.pem"
+
+[device]
+# Writable paths (rac drops privileges to torizon:torizon, so these live under the torizon home).
+ssh_private_key_path = "/home/torizon/run/rac/device-key.sec"   # generated on first run
+local_tuf_repo_path  = "/home/torizon/run/rac/uptane"
+unprivileged_user_group = "torizon:torizon"
+poll_timeout = { secs = 3, nanos = 0 }
+
+# Where an incoming tunnel connection is wired. target_host = the device's own sshd (simplest);
+# for stronger isolation switch to spawned_sshd (see the RAC README).
+[device.session.target_host]
+host_port = "127.0.0.1:22"
+authorized_keys_path = "/home/torizon/.ssh/authorized_keys"
