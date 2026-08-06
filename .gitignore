@@ -7,3 +7,6 @@ ota-ce/generated/
 ota-ce-gen
 project/project
 
+
+# Rendered at deploy by scripts/provision-vps.sh (contains the bcrypt hash). Template: caddy/Caddyfile.example
+caddy/Caddyfile

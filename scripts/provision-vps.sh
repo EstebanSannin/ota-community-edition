@@ -81,7 +81,9 @@ PROVISION_TOKEN_TTL=3600
 EOF
 # Render the Caddyfile with values inlined (incl. the bcrypt hash) — no env-var indirection, so
 # compose's interpolation can't mangle the hash's '$' chars. Only when a hash is provided.
+# caddy/Caddyfile is gitignored (generated secret); the checked-in template is caddy/Caddyfile.example.
 if [ -n "$CONSOLE_PASSWORD_HASH" ]; then
+  mkdir -p "$APP_DIR/caddy"
   cat > "$APP_DIR/caddy/Caddyfile" <<EOF
 {
 	email $ACME_EMAIL

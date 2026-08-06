@@ -24,6 +24,7 @@ services:
     # The Caddyfile is rendered with the domain/email/user/bcrypt-hash inlined by
     # scripts/provision-vps.sh — no env-var indirection, because Docker Compose interpolates
     # both `environment:` and `env_file` values and mangles the bcrypt hash's '$' characters.
+    # ./caddy/Caddyfile is gitignored (generated); the checked-in template is caddy/Caddyfile.example.
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
