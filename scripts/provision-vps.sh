@@ -65,7 +65,10 @@ cd "$APP_DIR"
 say "5/8  build the ras image ($OTA_CE_NS/ras:$OTA_CE_TAG)"
 docker build -t "$OTA_CE_NS/ras:$OTA_CE_TAG" remote-access/ras
 
-say "6/8  .env + caddy.env"
+say "6/8  .env + Caddyfile"
+# Provisioning token: reuse the existing one if present, else generate + persist (so re-runs are stable).
+PROVISION_TOKEN="${PROVISION_TOKEN:-$(grep -E '^PROVISION_TOKEN=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2)}"
+[ -n "$PROVISION_TOKEN" ] || PROVISION_TOKEN="$(openssl rand -hex 12)"
 # .env drives compose ${} substitution for the release stack (simple values, no '$').
 cat > "$APP_DIR/.env" <<EOF
 OTA_CE_NS=$OTA_CE_NS
@@ -73,6 +76,7 @@ OTA_CE_TAG=$OTA_CE_TAG
 RAS_PUBLIC_HOST=$RAS_PUBLIC_HOST
 RAS_SSH_USER=$RAS_SSH_USER
 CONSOLE_BIND=127.0.0.1
+PROVISION_TOKEN=$PROVISION_TOKEN
 EOF
 # Render the Caddyfile with values inlined (incl. the bcrypt hash) — no env-var indirection, so
 # compose's interpolation can't mangle the hash's '$' chars. Only when a hash is provided.
@@ -84,10 +88,18 @@ if [ -n "$CONSOLE_PASSWORD_HASH" ]; then
 
 $RAS_PUBLIC_HOST {
 	encode gzip
-	basic_auth {
-		$CONSOLE_USER $CONSOLE_PASSWORD_HASH
+	# Device enrollment is gated by PROVISION_TOKEN (not the console password), so these paths
+	# bypass basic_auth — a device can enroll with the token without the shared login.
+	@provision path /provision-device.sh /api/provision /api/provision/*
+	handle @provision {
+		reverse_proxy console:80
 	}
-	reverse_proxy console:80
+	handle {
+		basic_auth {
+			$CONSOLE_USER $CONSOLE_PASSWORD_HASH
+		}
+		reverse_proxy console:80
+	}
 }
 EOF
   chmod 600 "$APP_DIR/caddy/Caddyfile"
@@ -122,6 +134,17 @@ echo "   user_repo/root.json -> $code"
 chown -R "$ADMIN_USER:$ADMIN_USER" "$APP_DIR" || true
 say "done"
 docker compose "${FILES[@]}" ps
+cat <<EOF
+
+  ── access ─────────────────────────────────────────────────────────────
+  Console      https://$RAS_PUBLIC_HOST        (login: $CONSOLE_USER / <your password>)
+  Provision    on the device, map the gateway host then enroll with the token:
+     echo "<THIS_VPS_IP> ota.ce" | sudo tee -a /etc/hosts
+     curl -fsSL https://$RAS_PUBLIC_HOST/provision-device.sh | sudo bash -s -- \\
+          -s https://$RAS_PUBLIC_HOST -n <device-name> -t $PROVISION_TOKEN
+  Remote SSH   device page → "Remote access"; bastion = $RAS_PUBLIC_HOST
+  ────────────────────────────────────────────────────────────────────────
+EOF
 if [ -z "$CONSOLE_PASSWORD_HASH" ]; then
   echo; echo "NOTE: no CONSOLE_PASSWORD_HASH set — the Caddy TLS+password front was NOT started."
   echo "      Re-run with CONSOLE_PASSWORD_HASH set to expose the console at https://$RAS_PUBLIC_HOST"

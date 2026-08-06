@@ -106,7 +106,7 @@ services:
       - NAMESPACE=default
       # Optional: require a token to provision. When set, provision-device.sh must pass
       # -t <token> (and the console's "Provisioning token" field). Unset = open (LAN dev).
-      # - PROVISION_TOKEN=change-me
+      - PROVISION_TOKEN=${PROVISION_TOKEN:-}
     volumes:
       - ./ota-ce-gen:/gen:ro
       - ./scripts/certs:/certs:ro
