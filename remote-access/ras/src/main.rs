@@ -219,8 +219,11 @@ fn active_session(st: &AppState, uuid: &str) -> Option<(String, u16, DateTime<Ut
 async fn get_sessions(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let Some(uuid) = device_uuid(&st, &headers) else { return StatusCode::NOT_FOUND.into_response() };
     let Some((op_key, rport, exp)) = active_session(&st, &uuid) else { return StatusCode::NOT_FOUND.into_response() };
-    let pubs: Vec<ssh_key::PublicKey> = op_key.lines().filter_map(|l| l.trim().parse().ok()).collect();
+    let mut pubs: Vec<ssh_key::PublicKey> = op_key.lines().filter_map(|l| l.trim().parse().ok()).collect();
     if pubs.is_empty() { return StatusCode::INTERNAL_SERVER_ERROR.into_response(); }
+    // Authorize ras's own console key too, so the browser web-terminal can log in over the tunnel.
+    // rac derives the device's authorized_keys from this response, so it must be listed here.
+    pubs.push(st.console_pub.clone());
     let url = match Url::parse(&format!("ssh://{}@{}:{}", uuid, st.cfg.public_host, st.cfg.bastion_port)) {
         Ok(u) => u, Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
