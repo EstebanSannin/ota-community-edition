@@ -41,5 +41,9 @@ services:
     environment:
       DOCKER_HOST_HTTP: http://socket-proxy:2375
       COMPOSE_PROJECT: ota-community-edition
+    volumes:
+      # read-only host sysfs, for host network throughput (host netns). /sys has no process
+      # environ, so nothing sensitive leaks — unlike mounting /proc.
+      - /sys:/host/sys:ro
     expose:
       - "9910"             # internal only — reached by the console proxy at /api/ops/

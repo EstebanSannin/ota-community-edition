@@ -156,6 +156,8 @@ pre.code{margin:0;padding:14px 16px;background:#0a1119;color:#d6e2f0;font-family
 .hostgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .hostgrid .hr{display:flex;justify-content:space-between;gap:14px;padding:9px 18px;border-bottom:0.5px solid var(--border);font-size:13px}
 .hostgrid .hr .hk{color:var(--text-faint)} .hostgrid .hr .hv{font-weight:600;text-align:right;word-break:break-word}
+.cores{display:inline-flex;gap:3px;align-items:flex-end;height:22px} .cores .core{width:11px;height:22px;background:var(--surface-3);border-radius:2px;overflow:hidden;display:flex;align-items:flex-end} .cores .core i{width:100%;background:var(--accent);display:block}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px} .spin.hide{display:none} @keyframes spin{to{transform:rotate(360deg)}}
 /* ---- device detail ---- */
 .back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;text-decoration:none;margin-bottom:16px;cursor:pointer} .back:hover{color:var(--text)} .back svg{width:16px;height:16px}
 .dhdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
@@ -296,8 +298,18 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
           <div class="tile"><div class="muted" style="font-size:12px">Memory</div><div id="sys-mem" style="font-size:24px;font-weight:600">—</div></div>
           <div class="tile"><div class="muted" style="font-size:12px">Disk free</div><div id="sys-disk" style="font-size:24px;font-weight:600">—</div><div class="muted" id="sys-disk-sub" style="font-size:11.5px"></div></div>
         </div>
-        <div class="card" style="margin-top:12px"><header><h2>System information</h2><span class="grow"></span><span class="muted" id="sys-host-name" style="font-size:12.5px"></span></header>
+        <div class="card" style="margin-top:12px"><header><h2>System information</h2><span class="grow"></span>
+          <span class="spin hide" id="sys-spin"></span><span class="muted" id="sys-updated" style="font-size:12px;margin:0 10px"></span>
+          <span class="muted" id="sys-host-name" style="font-size:12.5px"></span></header>
           <div id="sys-host" class="hostgrid"><div class="empty">Loading…</div></div>
+        </div>
+        <div class="card" style="margin-top:12px"><header><h2>Machine</h2></header>
+          <div class="hostgrid">
+            <div class="hr"><span class="hk">Load average (1 / 5 / 15 min)</span><span class="hv mono" id="sys-load">—</span></div>
+            <div class="hr"><span class="hk">Uptime</span><span class="hv" id="sys-uptime">—</span></div>
+            <div class="hr"><span class="hk">Network</span><span class="hv mono" id="sys-net">—</span></div>
+            <div class="hr"><span class="hk">Per-core CPU</span><span class="hv" id="sys-cores">—</span></div>
+          </div>
         </div>
         <div class="card" style="margin-top:12px"><header><h2>Services</h2><span class="grow"></span><button class="btn sm" onclick="loadSystem()">Refresh</button></header>
           <div id="sys-services" class="tablewrap"><div class="empty">Loading…</div></div>
@@ -1109,22 +1121,16 @@ setInterval(()=>{if(document.getElementById('v-device').classList.contains('acti
 setInterval(()=>{if(document.getElementById('v-remote').classList.contains('active'))loadRaSessions();},5000);
 
 // ---------- System page (ops sidecar: status + resources + live logs) ----------
-let _logES=null;
+let _logES=null, _sysLast=null;
 function fmtMB(mb){return mb>=1024?(mb/1024).toFixed(1)+' GB':(mb||0)+' MB';}
-async function loadSystem(){
-  const svcEl=document.getElementById('sys-services');
-  let d;
-  try{ d=await api('/api/ops/status'); }
-  catch(e){
-    if(svcEl)svcEl.innerHTML='<div class="empty">Ops service not reachable — deploy the observability overlay (<span class="mono">compose.observability.yaml</span>).</div>';
-    ['sys-svc','sys-cpu','sys-mem','sys-disk'].forEach(id=>{const x=document.getElementById(id);if(x)x.textContent='—';});
-    return;
-  }
-  const t=d.totals||{};
+function fmtBps(b){b=b||0;const u=['B','KB','MB','GB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++;}return (i?b.toFixed(1):Math.round(b))+' '+u[i]+'/s';}
+function fmtUptime(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+'d '+h+'h':(h?h+'h '+m+'m':m+'m');}
+function setSysSpin(on,txt){const s=document.getElementById('sys-spin'),u=document.getElementById('sys-updated');if(s)s.classList.toggle('hide',!on);if(u&&txt!==undefined)u.textContent=txt;}
+function renderSystem(d){
+  const t=d.totals||{},dk=d.disk||{},dd=d.docker_disk||{},h=d.host||{},m=d.machine||{};
   document.getElementById('sys-svc').textContent=(t.up||0)+' / '+(t.total||0);
   document.getElementById('sys-cpu').textContent=(t.cpu||0)+'%';
   document.getElementById('sys-mem').textContent=fmtMB(t.mem_used_mb)+' / '+fmtMB(t.mem_total_mb);
-  const dk=d.disk||{}, dd=d.docker_disk||{}, h=d.host||{};
   document.getElementById('sys-disk').textContent=fmtMB(dk.free_mb)+' free';
   document.getElementById('sys-disk-sub').textContent=fmtMB(dk.used_mb)+' used of '+fmtMB(dk.total_mb)+' ('+(dk.pct||0)+'%)';
   document.getElementById('sys-host-name').textContent=h.hostname||'';
@@ -1134,15 +1140,33 @@ async function loadSystem(){
     ['Docker usage','images '+fmtMB(dd.images_mb)+' · volumes '+fmtMB(dd.volumes_mb)+' · cache '+fmtMB(dd.build_cache_mb)]];
   document.getElementById('sys-host').innerHTML=hrows.filter(r=>r[1]!==undefined&&r[1]!=='').map(r=>
     '<div class="hr"><span class="hk">'+esc(r[0])+'</span><span class="hv">'+esc(String(r[1]))+'</span></div>').join('');
+  document.getElementById('sys-load').textContent=(m.load&&m.load.length)?m.load.map(x=>x.toFixed(2)).join('  '):'—';
+  document.getElementById('sys-uptime').textContent=m.uptime_secs?fmtUptime(m.uptime_secs):'—';
+  document.getElementById('sys-net').innerHTML=(m.net&&m.net.length)?m.net.map(n=>esc(n.iface)+' ↓'+fmtBps(n.rx_bps)+' ↑'+fmtBps(n.tx_bps)).join('&nbsp;&nbsp;'):'—';
+  const cores=m.cores||[];
+  document.getElementById('sys-cores').innerHTML=cores.length?'<span class="cores">'+cores.map(c=>'<span class="core" title="core '+c.core+': '+c.pct+'%"><i style="height:'+Math.max(3,Math.min(100,c.pct))+'%"></i></span>').join('')+'</span>':'—';
   const rows=d.services||[];
-  svcEl.innerHTML='<table><thead><tr><th>Service</th><th>State</th><th class="right">CPU</th><th class="right">Memory</th><th>Status</th></tr></thead><tbody>'+
+  document.getElementById('sys-services').innerHTML='<table><thead><tr><th>Service</th><th>State</th><th class="right">CPU</th><th class="right">Memory</th><th>Status</th></tr></thead><tbody>'+
     rows.map(r=>{const ok=r.state==='running';
       const dot='<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:'+(ok?'var(--ok)':'var(--bad)')+'"></span>';
       return '<tr><td>'+dot+esc(r.service)+'</td><td class="'+(ok?'':'muted')+'">'+esc(r.state)+'</td><td class="mono right">'+(r.cpu||0)+'%</td><td class="mono right">'+fmtMB(r.mem_mb)+'</td><td class="muted">'+esc(r.status||'')+'</td></tr>';
     }).join('')+'</tbody></table>';
-  const pick=document.getElementById('sys-log-pick'),cur=pick.value,names=rows.map(r=>r.name);
+  const pick=document.getElementById('sys-log-pick'),cur=pick.value;
   pick.innerHTML='<option value="">Select a service…</option>'+rows.map(r=>'<option value="'+esc(r.name)+'">'+esc(r.service)+'</option>').join('');
-  if(cur&&names.includes(cur))pick.value=cur;
+  if(cur&&rows.some(r=>r.name===cur))pick.value=cur;
+}
+async function loadSystem(){
+  if(!_sysLast){try{_sysLast=JSON.parse(localStorage.getItem('ops:last')||'null');}catch(e){}}
+  const first=!_sysLast;
+  if(_sysLast)renderSystem(_sysLast);                 // instant paint from last-known data
+  if(first)setSysSpin(true,'loading…');
+  let d;
+  try{ d=await api('/api/ops/status'); }
+  catch(e){ if(first)document.getElementById('sys-services').innerHTML='<div class="empty">Ops service not reachable — deploy the observability overlay (<span class="mono">compose.observability.yaml</span>).</div>'; setSysSpin(false,'offline'); return; }
+  if(d&&d.warming){ setSysSpin(true,'warming up…'); return; }
+  if(d&&d.error){ if(first)document.getElementById('sys-services').innerHTML='<div class="empty">Docker unreachable from ops: '+esc(d.error)+'</div>'; setSysSpin(false,'error'); return; }
+  _sysLast=d; try{localStorage.setItem('ops:last',JSON.stringify(d));}catch(e){}
+  renderSystem(d); setSysSpin(false,'updated just now');
 }
 function stopLogStream(){ if(_logES){_logES.close();_logES=null;} }
 function startLogStream(name){

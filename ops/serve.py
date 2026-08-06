@@ -7,7 +7,7 @@ Two endpoints, both meant to sit behind the console password at the proxy:
     GET /api/status          -> JSON: per-container state + cpu/mem, totals, docker disk usage
     GET /api/logs?name=<c>   -> Server-Sent Events stream of that container's logs (follow)
 """
-import http.server, json, os, shutil, struct, time, urllib.request
+import http.server, json, os, shutil, struct, threading, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 DOCKER = os.environ.get("DOCKER_HOST_HTTP", "http://socket-proxy:2375").rstrip("/")
@@ -122,6 +122,115 @@ def build_status():
     }
 
 
+# ---- host machine metrics (load, uptime, per-core cpu, network) ----
+# loadavg/uptime/stat are host-wide even inside the container (not namespaced); network comes
+# from the read-only host sysfs mount (/sys has no process environ, so nothing sensitive leaks).
+NET_SYS = "/host/sys/class/net"
+
+
+def read_loadavg():
+    try:
+        with open("/proc/loadavg") as f:
+            return [float(x) for x in f.read().split()[:3]]
+    except Exception:
+        return []
+
+
+def read_uptime():
+    try:
+        with open("/proc/uptime") as f:
+            return int(float(f.read().split()[0]))
+    except Exception:
+        return 0
+
+
+def read_cpu():
+    """{core: (idle, total)} from /proc/stat."""
+    out = {}
+    try:
+        with open("/proc/stat") as f:
+            for line in f:
+                if line.startswith("cpu") and line[3:4].isdigit():
+                    fields = [int(x) for x in line.split()[1:]]
+                    idle = fields[3] + (fields[4] if len(fields) > 4 else 0)  # idle + iowait
+                    out[int(line.split()[0][3:])] = (idle, sum(fields))
+    except Exception:
+        pass
+    return out
+
+
+def read_net():
+    """{iface: (rx_bytes, tx_bytes)} for physical interfaces, via the host sysfs mount."""
+    out = {}
+    try:
+        for iface in sorted(os.listdir(NET_SYS)):
+            if iface == "lo" or iface.startswith(("veth", "br-", "docker")):
+                continue
+            try:
+                with open(f"{NET_SYS}/{iface}/statistics/rx_bytes") as f:
+                    rx = int(f.read())
+                with open(f"{NET_SYS}/{iface}/statistics/tx_bytes") as f:
+                    tx = int(f.read())
+                out[iface] = (rx, tx)
+            except Exception:
+                pass
+    except FileNotFoundError:
+        pass                                   # /sys not mounted
+    return out
+
+
+class Sampler:
+    """Refreshes the whole snapshot on a timer so /api/status answers instantly, and so per-core
+    CPU% and network rate come from the delta between two timed reads."""
+    def __init__(self, interval):
+        self.interval = interval
+        self.lock = threading.Lock()
+        self.snapshot = None
+        self._cpu = self._net = self._t = None
+
+    def machine(self):
+        cpu, net, t = read_cpu(), read_net(), time.monotonic()
+        cores, links = [], []
+        if self._cpu and self._t and t > self._t:
+            for i in sorted(cpu):
+                if i in self._cpu:
+                    d_idle, d_tot = cpu[i][0] - self._cpu[i][0], cpu[i][1] - self._cpu[i][1]
+                    cores.append({"core": i, "pct": round((1 - d_idle / d_tot) * 100, 1) if d_tot > 0 else 0.0})
+            dt = t - self._t
+            for iface, (rx, tx) in net.items():
+                if iface in self._net:
+                    links.append({"iface": iface,
+                                  "rx_bps": round((rx - self._net[iface][0]) / dt),
+                                  "tx_bps": round((tx - self._net[iface][1]) / dt)})
+        self._cpu, self._net, self._t = cpu, net, t
+        return {"load": read_loadavg(), "uptime_secs": read_uptime(), "cores": cores, "net": links}
+
+    def tick(self):
+        snap = build_status()
+        snap["machine"] = self.machine()
+        snap["sampled_at"] = int(time.time())
+        with self.lock:
+            self.snapshot = snap
+
+    def run(self):
+        while True:
+            try:
+                self.tick()
+            except Exception as e:
+                with self.lock:
+                    if self.snapshot is None:
+                        self.snapshot = {"error": str(e)}
+                print("ops: sampler error:", e, flush=True)
+            time.sleep(self.interval)
+
+    def get(self):
+        with self.lock:
+            return self.snapshot
+
+
+sampler = Sampler(int(os.environ.get("OPS_SAMPLE_SECS", "3")))
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print("ops: " + (fmt % args), flush=True)
@@ -139,10 +248,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path in ("/api/health", "/health"):
             self._json(200, {"ok": True})
         elif path == "/api/status":
-            try:
-                self._json(200, build_status())
-            except Exception as e:
-                self._json(502, {"error": f"docker unreachable: {e}"})
+            snap = sampler.get()
+            self._json(200, snap if snap is not None else {"warming": True})
         elif path == "/api/logs":
             self.stream_logs()
         else:
@@ -213,4 +320,5 @@ def read_exact(stream, n):
 
 if __name__ == "__main__":
     print(f"ops: listening on :{PORT}, docker via {DOCKER}, project {PROJECT}", flush=True)
+    threading.Thread(target=sampler.run, daemon=True).start()
     http.server.ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
