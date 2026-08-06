@@ -7,7 +7,7 @@ Two endpoints, both meant to sit behind the console password at the proxy:
     GET /api/status          -> JSON: per-container state + cpu/mem, totals, docker disk usage
     GET /api/logs?name=<c>   -> Server-Sent Events stream of that container's logs (follow)
 """
-import http.server, json, os, struct, time, urllib.request
+import http.server, json, os, shutil, struct, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 DOCKER = os.environ.get("DOCKER_HOST_HTTP", "http://socket-proxy:2375").rstrip("/")
@@ -87,11 +87,19 @@ def docker_disk():
     return val
 
 
+def host_disk():
+    """Real host filesystem usage. The container root is an overlay on the host disk, so its
+    statvfs reports the backing filesystem (the VPS's main disk)."""
+    total, used, free = shutil.disk_usage("/")
+    return {"total_mb": round(total / 1048576), "used_mb": round(used / 1048576),
+            "free_mb": round(free / 1048576), "pct": round(used / total * 100) if total else 0}
+
+
 def build_status():
     containers = our_containers()
     with ThreadPoolExecutor(max_workers=8) as pool:
         rows = sorted(pool.map(container_stat, containers), key=lambda r: r["service"])
-    info = docker_get("/info")
+    info = docker_get("/info")   # host facts: os, kernel, arch, cpu, memory (no host mount needed)
     up = sum(1 for r in rows if r["state"] == "running")
     return {
         "services": rows,
@@ -101,6 +109,15 @@ def build_status():
             "mem_used_mb": sum(r["mem_mb"] for r in rows),
             "mem_total_mb": round(info.get("MemTotal", 0) / 1048576),
         },
+        "host": {
+            "hostname": info.get("Name", ""),
+            "os": info.get("OperatingSystem", ""),
+            "kernel": info.get("KernelVersion", ""),
+            "arch": info.get("Architecture", ""),
+            "cpus": info.get("NCPU", 0),
+            "docker": info.get("ServerVersion", ""),
+        },
+        "disk": host_disk(),
         "docker_disk": docker_disk(),
     }
 

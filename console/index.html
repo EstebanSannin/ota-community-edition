@@ -153,6 +153,9 @@ pre.code{margin:0;padding:14px 16px;background:#0a1119;color:#d6e2f0;font-family
 .termhost .xterm{height:100%}
 .logpane{height:min(52vh,460px);overflow:auto;background:#0b0f14;color:#c9d1d9;font-family:var(--mono);font-size:12px;line-height:1.65;padding:10px 12px;border-bottom-left-radius:var(--radius);border-bottom-right-radius:var(--radius)}
 .logpane .ll{white-space:pre-wrap;word-break:break-word} .logpane .lt{color:#6e7681;margin-right:8px}
+.hostgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.hostgrid .hr{display:flex;justify-content:space-between;gap:14px;padding:9px 18px;border-bottom:0.5px solid var(--border);font-size:13px}
+.hostgrid .hr .hk{color:var(--text-faint)} .hostgrid .hr .hv{font-weight:600;text-align:right;word-break:break-word}
 /* ---- device detail ---- */
 .back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;text-decoration:none;margin-bottom:16px;cursor:pointer} .back:hover{color:var(--text)} .back svg{width:16px;height:16px}
 .dhdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
@@ -291,7 +294,10 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
           <div class="tile"><div class="muted" style="font-size:12px">Services</div><div id="sys-svc" style="font-size:24px;font-weight:600">—</div></div>
           <div class="tile"><div class="muted" style="font-size:12px">CPU</div><div id="sys-cpu" style="font-size:24px;font-weight:600">—</div></div>
           <div class="tile"><div class="muted" style="font-size:12px">Memory</div><div id="sys-mem" style="font-size:24px;font-weight:600">—</div></div>
-          <div class="tile"><div class="muted" style="font-size:12px">Docker disk</div><div id="sys-disk" style="font-size:24px;font-weight:600">—</div></div>
+          <div class="tile"><div class="muted" style="font-size:12px">Disk free</div><div id="sys-disk" style="font-size:24px;font-weight:600">—</div><div class="muted" id="sys-disk-sub" style="font-size:11.5px"></div></div>
+        </div>
+        <div class="card" style="margin-top:12px"><header><h2>System information</h2><span class="grow"></span><span class="muted" id="sys-host-name" style="font-size:12.5px"></span></header>
+          <div id="sys-host" class="hostgrid"><div class="empty">Loading…</div></div>
         </div>
         <div class="card" style="margin-top:12px"><header><h2>Services</h2><span class="grow"></span><button class="btn sm" onclick="loadSystem()">Refresh</button></header>
           <div id="sys-services" class="tablewrap"><div class="empty">Loading…</div></div>
@@ -1118,7 +1124,16 @@ async function loadSystem(){
   document.getElementById('sys-svc').textContent=(t.up||0)+' / '+(t.total||0);
   document.getElementById('sys-cpu').textContent=(t.cpu||0)+'%';
   document.getElementById('sys-mem').textContent=fmtMB(t.mem_used_mb)+' / '+fmtMB(t.mem_total_mb);
-  document.getElementById('sys-disk').textContent=fmtMB((d.docker_disk||{}).total_mb);
+  const dk=d.disk||{}, dd=d.docker_disk||{}, h=d.host||{};
+  document.getElementById('sys-disk').textContent=fmtMB(dk.free_mb)+' free';
+  document.getElementById('sys-disk-sub').textContent=fmtMB(dk.used_mb)+' used of '+fmtMB(dk.total_mb)+' ('+(dk.pct||0)+'%)';
+  document.getElementById('sys-host-name').textContent=h.hostname||'';
+  const hrows=[['Operating system',h.os],['Kernel',h.kernel],['Architecture',h.arch],['CPUs',h.cpus],
+    ['Total memory',fmtMB(t.mem_total_mb)],['Docker',h.docker],
+    ['Disk',fmtMB(dk.used_mb)+' / '+fmtMB(dk.total_mb)+' ('+(dk.pct||0)+'%) · '+fmtMB(dk.free_mb)+' free'],
+    ['Docker usage','images '+fmtMB(dd.images_mb)+' · volumes '+fmtMB(dd.volumes_mb)+' · cache '+fmtMB(dd.build_cache_mb)]];
+  document.getElementById('sys-host').innerHTML=hrows.filter(r=>r[1]!==undefined&&r[1]!=='').map(r=>
+    '<div class="hr"><span class="hk">'+esc(r[0])+'</span><span class="hv">'+esc(String(r[1]))+'</span></div>').join('');
   const rows=d.services||[];
   svcEl.innerHTML='<table><thead><tr><th>Service</th><th>State</th><th class="right">CPU</th><th class="right">Memory</th><th>Status</th></tr></thead><tbody>'+
     rows.map(r=>{const ok=r.state==='running';
