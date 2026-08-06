@@ -74,16 +74,23 @@ RAS_PUBLIC_HOST=$RAS_PUBLIC_HOST
 RAS_SSH_USER=$RAS_SSH_USER
 CONSOLE_BIND=127.0.0.1
 EOF
-# caddy.env is passed to the container via env_file (literal, NOT interpolated) — so the bcrypt
-# hash's '$' chars survive untouched. Written only when a hash is provided.
+# Render the Caddyfile with values inlined (incl. the bcrypt hash) — no env-var indirection, so
+# compose's interpolation can't mangle the hash's '$' chars. Only when a hash is provided.
 if [ -n "$CONSOLE_PASSWORD_HASH" ]; then
-  cat > "$APP_DIR/caddy.env" <<EOF
-RAS_PUBLIC_HOST=$RAS_PUBLIC_HOST
-ACME_EMAIL=$ACME_EMAIL
-CONSOLE_USER=$CONSOLE_USER
-CONSOLE_PASSWORD_HASH=$CONSOLE_PASSWORD_HASH
+  cat > "$APP_DIR/caddy/Caddyfile" <<EOF
+{
+	email $ACME_EMAIL
+}
+
+$RAS_PUBLIC_HOST {
+	encode gzip
+	basic_auth {
+		$CONSOLE_USER $CONSOLE_PASSWORD_HASH
+	}
+	reverse_proxy console:80
+}
 EOF
-  chmod 600 "$APP_DIR/caddy.env"
+  chmod 600 "$APP_DIR/caddy/Caddyfile"
 fi
 
 say "7/8  certs + bring up the stack"

@@ -21,12 +21,9 @@ services:
     ports:
       - "80:80"     # ACME HTTP-01 challenge + HTTP->HTTPS redirect
       - "443:443"
-    # Values come from caddy.env (NOT compose ${} interpolation) so the bcrypt hash's '$'
-    # characters pass through literally. Create caddy.env with:
-    #   RAS_PUBLIC_HOST=... ACME_EMAIL=... CONSOLE_USER=admin
-    #   CONSOLE_PASSWORD_HASH=$(docker run --rm caddy caddy hash-password --plaintext 'PASS')
-    env_file:
-      - ./caddy.env
+    # The Caddyfile is rendered with the domain/email/user/bcrypt-hash inlined by
+    # scripts/provision-vps.sh — no env-var indirection, because Docker Compose interpolates
+    # both `environment:` and `env_file` values and mangles the bcrypt hash's '$' characters.
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
