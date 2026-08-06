@@ -89,12 +89,12 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);
 .modal{position:fixed;inset:0;display:none;place-items:start center;padding:70px 16px;background:rgba(8,14,22,.55);z-index:50} .modal.open{display:grid}
 .modal .m{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);width:min(720px,100%);overflow:hidden}
 .modal .m header{display:flex;align-items:center;padding:17px 20px;border-bottom:1px solid var(--border)} .modal .m header h3{margin:0;font-size:16px;font-weight:680}
-.modal .m.mini{width:min(440px,100%)}
+.modal .m.mini{width:min(440px,100%)} .modal .m.ramodal{width:min(560px,94vw)}
 .modal .m .mbody{padding:20px}
 .modal .m .mbody .ml{display:block;font-size:12px;color:var(--text-dim);margin-bottom:7px;font-weight:600}
 .modal .m .mbody .mf{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box} .modal .m .mbody .mf:focus{outline:none;border-color:var(--accent)} .modal .m .mbody textarea.mf{resize:vertical;min-height:64px}
 .modal .m .mbody .mmsg{margin:0;color:var(--text);line-height:1.55;font-size:14px}
-.modal .m footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface-2)} .modal .m footer .grow{flex:1}
+.modal .m footer{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;row-gap:8px;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface-2)} .modal .m footer .grow{flex:1}
 .cmdbox{display:flex;align-items:center;gap:8px;background:#0a1119;border-radius:9px;padding:10px 12px} .cmdbox code{font-family:var(--mono);font-size:12.5px;flex:1;word-break:break-all;color:#d6e2f0} .cmdbox .btn{flex:none}
 .modal .m .btn.dbad{background:var(--bad);border-color:var(--bad);color:#fff}
 .modal .m .picklist{padding:14px 14px 6px;max-height:56vh;overflow:auto}
@@ -443,7 +443,7 @@ async function stopRemoteAccess(uuid,ov){
 function showRemoteModal(r){
   const cmd=r.ssh_command||'';const uuid=CUR&&CUR.uuid;
   const ov=document.createElement('div');ov.className='modal open';
-  ov.innerHTML=`<div class="m mini"><header><h3>Remote access ready</h3></header>
+  ov.innerHTML=`<div class="m ramodal"><header><h3>Remote access ready</h3></header>
     <div class="mbody">
       <p class="mmsg" style="margin:0 0 10px">Run this on your computer — the device connects within a few seconds:</p>
       <div class="cmdbox"><code id="ra-cmd"></code><button class="btn sm" id="ra-copy">Copy</button></div>
