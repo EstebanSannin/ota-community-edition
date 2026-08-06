@@ -1,13 +1,12 @@
 # RAC (Torizon Remote Access Client) config for this OTA CE instance.
 # Copy to /etc/rac/client.toml on the device, then: sudo systemctl restart rac (or aktualizr-torizon).
 #
-# The device reaches the mTLS gateway at ota.ce:30443, so add the gateway host to /etc/hosts:
-#   echo "<VPS_public_IP> ota.ce" | sudo tee -a /etc/hosts
-# The bastion + operator SSH use your real domain (RAS_PUBLIC_HOST), resolved via public DNS.
+# Point rac at the SAME gateway your device's aktualizr uses (the instance's GATEWAY_URL host).
+# With a real DNS gateway (recommended) no /etc/hosts is needed — just use the domain below.
 [torizon]
-url = "https://ota.ce:30443/ras/"
+url = "https://ota.example.com:30443/ras/"          # <-- replace with your gateway domain
 # Must be explicit — the default (/director/) would hit the aktualizr director, not ras.
-director_url = "https://ota.ce:30443/ras/director/"
+director_url = "https://ota.example.com:30443/ras/director/"
 server_cert_path = "/var/sota/import/root.crt"     # the instance CA (already on provisioned devices)
 client_cert_path = "/var/sota/import/client.pem"   # the device's mTLS cert (CN = device UUID)
 client_key_path  = "/var/sota/import/pkey.pem"

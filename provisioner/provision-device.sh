@@ -4,10 +4,10 @@
 #   curl -fsSL http://<server>:8080/provision-device.sh | sudo bash -s -- -s http://<server>:8080 [-n name]
 set -euo pipefail
 
-SERVER_URL=""; NAME=""; TOKEN=""
-usage(){ echo "usage: curl -fsSL <server>/provision-device.sh | sudo bash -s -- -s <server-url> [-n name] [-t token]"; }
-while getopts ":s:n:t:h" o; do case $o in
-  s) SERVER_URL=$OPTARG;; n) NAME=$OPTARG;; t) TOKEN=$OPTARG;; h) usage; exit 0;; \?) usage; exit 1;; esac; done
+SERVER_URL=""; NAME=""; TOKEN=""; REPORTER=0
+usage(){ echo "usage: curl -fsSL <server>/provision-device.sh | sudo bash -s -- -s <server-url> [-n name] [-t token] [-r]"; }
+while getopts ":s:n:t:rh" o; do case $o in
+  s) SERVER_URL=$OPTARG;; n) NAME=$OPTARG;; t) TOKEN=$OPTARG;; r) REPORTER=1;; h) usage; exit 0;; \?) usage; exit 1;; esac; done
 
 [ -z "$SERVER_URL" ] && { echo "ERROR: -s <server-url> is required"; usage; exit 1; }
 [ "$(id -u)" -ne 0 ] && { echo "ERROR: run as root (pipe into 'sudo bash')"; exit 1; }
@@ -33,10 +33,10 @@ echo "$resp" | jq -r .cacert > /var/sota/import/root.crt
 echo "$gwurl" > /var/sota/import/gateway.url
 chmod 600 /var/sota/import/pkey.pem
 
-# resolve the gateway hostname (cert CN) to the server host
-if ! grep -qE "[[:space:]]$gwhost(\$|[[:space:]])" /etc/hosts; then
-  echo "$srvhost $gwhost" >> /etc/hosts
-  echo "== Added '$srvhost $gwhost' to /etc/hosts"
+# Map the gateway hostname only if it does NOT resolve (e.g. the ota.ce placeholder) AND we reached
+# the server by IP. With a real DNS gateway (recommended) this is skipped entirely.
+if ! getent hosts "$gwhost" >/dev/null 2>&1 && echo "$srvhost" | grep -qE '^[0-9.]+$'; then
+  grep -qE "[[:space:]]$gwhost(\$|[[:space:]])" /etc/hosts || { echo "$srvhost $gwhost" >> /etc/hosts; echo "== Mapped $gwhost -> $srvhost in /etc/hosts"; }
 fi
 
 # override the baked-in gateway URL + server CA (which point at Torizon Cloud)
@@ -52,6 +52,11 @@ EOF
 rm -f /var/sota/sql.db
 echo "== Starting aktualizr ..."
 systemctl restart aktualizr
+
+if [ "$REPORTER" = "1" ]; then
+  echo "== Installing the hardware reporter ..."
+  curl -fsSL "$SERVER_URL/install-reporter.sh" | bash || echo "WARN: reporter install failed (device is still provisioned)"
+fi
 
 echo ""
 echo "== Success! Device $uuid provisioned against $gwurl"

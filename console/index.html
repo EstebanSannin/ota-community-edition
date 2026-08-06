@@ -290,6 +290,7 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
           <input id="provToken" placeholder="click Generate" oninput="renderProvCmd()" style="flex:1">
           <button type="button" class="btn sm" id="provGenBtn" onclick="generateProvToken()">Generate</button>
         </div></label></div>
+      <label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13.5px"><input type="checkbox" id="provReporter" checked onchange="renderProvCmd()" style="width:16px;height:16px"><span>Also install the hardware reporter (kernel/OS/disk/peripherals in the device view)</span></label>
       <div><span class="lbl2">Run this on the device as root</span><textarea id="provCmd" class="cmd" rows="3" readonly onclick="this.select()"></textarea></div>
       <button class="btn primary" onclick="copyProvCmd()" style="align-self:start">⧉ Copy command</button>
       <div class="msg" id="provMsg"></div>
@@ -986,7 +987,7 @@ async function generateProvToken(){
   finally{ if(btn)btn.disabled=false; }
 }
 function closeProvision(){document.getElementById('provModal').classList.remove('open');}
-function renderProvCmd(){const name=(document.getElementById('provName').value||'').trim().replace(/[^A-Za-z0-9_-]/g,'');const tok=(document.getElementById('provToken').value||'').trim();const o=location.origin,n=name?(' -n '+name):'',t=tok?(' -t '+tok):'';document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}${t}`;}
+function renderProvCmd(){const name=(document.getElementById('provName').value||'').trim().replace(/[^A-Za-z0-9_-]/g,'');const tok=(document.getElementById('provToken').value||'').trim();const rep=document.getElementById('provReporter')?.checked?' -r':'';const o=location.origin,n=name?(' -n '+name):'',t=tok?(' -t '+tok):'';document.getElementById('provCmd').value=`curl -fsSL ${o}/provision-device.sh | sudo bash -s -- -s ${o}${n}${t}${rep}`;}
 function copyProvCmd(){const t=document.getElementById('provCmd');navigator.clipboard.writeText(t.value).then(()=>showMsg(document.getElementById('provMsg'),'ok','Copied — paste into a root shell on the device.')).catch(()=>{t.select();document.execCommand('copy');});}
 
 // ---------- boot ----------

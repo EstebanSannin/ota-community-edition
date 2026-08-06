@@ -48,8 +48,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         print("provisioner: " + (fmt % args), flush=True)
 
     def do_GET(self):
-        if self.path.split("?")[0] == "/provision-device.sh":
-            with open(f"{APP}/provision-device.sh", "rb") as f:
+        p = self.path.split("?")[0]
+        if p in ("/provision-device.sh", "/install-reporter.sh"):
+            with open(f"{APP}{p}", "rb") as f:
                 self._send(200, f.read(), "text/x-shellscript")
         else:
             self._send(404, "not found\n", "text/plain")

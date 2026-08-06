@@ -91,7 +91,7 @@ $RAS_PUBLIC_HOST {
 	encode gzip
 	# Device enrollment is gated by PROVISION_TOKEN (not the console password), so these paths
 	# bypass basic_auth — a device can enroll with the token without the shared login.
-	@provision path /provision-device.sh /api/provision /api/provision/*
+	@provision path /provision-device.sh /install-reporter.sh /api/provision /api/provision/*
 	handle @provision {
 		reverse_proxy console:80
 	}
@@ -147,9 +147,9 @@ cat <<EOF
 
   ── access ─────────────────────────────────────────────────────────────
   Console      https://$RAS_PUBLIC_HOST        (login: $CONSOLE_USER / <your password>)
-  Provision    open the console → "Provision device" — a SHORT-LIVED token is generated for you;
-               copy the shown command and run it on the device (first map the gateway host:
-               echo "<THIS_VPS_IP> ota.ce" | sudo tee -a /etc/hosts).
+  Provision    open the console → "Provision device" — a SHORT-LIVED token is generated for you
+               (tick "install the hardware reporter" for the full device view); copy the shown
+               command and run it on the device as root. No /etc/hosts needed (real DNS gateway).
   Remote SSH   device page → "Remote access"; bastion = $RAS_PUBLIC_HOST
   ────────────────────────────────────────────────────────────────────────
 EOF
