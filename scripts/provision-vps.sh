@@ -67,7 +67,8 @@ docker build -t "$OTA_CE_NS/ras:$OTA_CE_TAG" remote-access/ras
 
 say "6/8  .env + Caddyfile"
 # Provisioning token: reuse the existing one if present, else generate + persist (so re-runs are stable).
-PROVISION_TOKEN="${PROVISION_TOKEN:-$(grep -E '^PROVISION_TOKEN=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2)}"
+EXISTING_TOKEN="$( (grep -E '^PROVISION_TOKEN=' "$APP_DIR/.env" 2>/dev/null || true) | cut -d= -f2 || true)"
+PROVISION_TOKEN="${PROVISION_TOKEN:-$EXISTING_TOKEN}"
 [ -n "$PROVISION_TOKEN" ] || PROVISION_TOKEN="$(openssl rand -hex 12)"
 # .env drives compose ${} substitution for the release stack (simple values, no '$').
 cat > "$APP_DIR/.env" <<EOF
