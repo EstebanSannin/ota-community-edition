@@ -21,11 +21,12 @@ services:
     ports:
       - "80:80"     # ACME HTTP-01 challenge + HTTP->HTTPS redirect
       - "443:443"
-    environment:
-      - RAS_PUBLIC_HOST=${RAS_PUBLIC_HOST:?set to your VPS domain}
-      - ACME_EMAIL=${ACME_EMAIL:?set to your email for Let's Encrypt}
-      - CONSOLE_USER=${CONSOLE_USER:-admin}
-      - CONSOLE_PASSWORD_HASH=${CONSOLE_PASSWORD_HASH:?generate with: docker run --rm caddy caddy hash-password --plaintext PASS}
+    # Values come from caddy.env (NOT compose ${} interpolation) so the bcrypt hash's '$'
+    # characters pass through literally. Create caddy.env with:
+    #   RAS_PUBLIC_HOST=... ACME_EMAIL=... CONSOLE_USER=admin
+    #   CONSOLE_PASSWORD_HASH=$(docker run --rm caddy caddy hash-password --plaintext 'PASS')
+    env_file:
+      - ./caddy.env
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
