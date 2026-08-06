@@ -151,6 +151,8 @@ pre.code{margin:0;padding:14px 16px;background:#0a1119;color:#d6e2f0;font-family
 .termstatus.ok{background:var(--ok-bg);color:var(--ok)} .termstatus.bad{background:var(--bad-bg);color:var(--bad)}
 .termhost{height:min(62vh,540px);padding:8px 6px 4px 10px;background:#0b0f14;border-bottom-left-radius:14px;border-bottom-right-radius:14px}
 .termhost .xterm{height:100%}
+.logpane{height:min(52vh,460px);overflow:auto;background:#0b0f14;color:#c9d1d9;font-family:var(--mono);font-size:12px;line-height:1.65;padding:10px 12px;border-bottom-left-radius:var(--radius);border-bottom-right-radius:var(--radius)}
+.logpane .ll{white-space:pre-wrap;word-break:break-word} .logpane .lt{color:#6e7681;margin-right:8px}
 /* ---- device detail ---- */
 .back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;text-decoration:none;margin-bottom:16px;cursor:pointer} .back:hover{color:var(--text)} .back svg{width:16px;height:16px}
 .dhdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
@@ -199,6 +201,7 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
       <div class="lbl">Software</div>
       <a data-view="packages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>Packages<span class="badge" id="nav-tgt">0</span></a>
       <a data-view="remote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>Remote Access<span class="badge" id="nav-ra">0</span></a>
+      <a data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 5h16v10H4z"/><path d="M2 19h20M9 15v4M15 15v4"/></svg>System<span class="badge" id="nav-sys"></span></a>
       <a href="apidocs/" target="_blank" rel="noopener" title="Open the API reference in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M9 9h.01M12 9h.01M8 13h8"/></svg>API<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;margin-left:auto;opacity:.6"><path d="M14 3h7v7M21 3l-9 9M5 5h5M5 5v14h14v-5"/></svg></a>
     </nav>
     <div class="foot"><span class="dot" id="dot"></span> <span id="status">connecting…</span></div>
@@ -282,6 +285,23 @@ details.disc summary .sub{margin-left:auto;text-transform:none;letter-spacing:0;
           <div class="tablewrap" id="ra-sessions"><div class="empty">Loading…</div></div>
         </div>
       </section>
+
+      <section class="view" id="v-system">
+        <div class="cards" id="sys-metrics" style="grid-template-columns:repeat(4,1fr)">
+          <div class="tile"><div class="muted" style="font-size:12px">Services</div><div id="sys-svc" style="font-size:24px;font-weight:600">—</div></div>
+          <div class="tile"><div class="muted" style="font-size:12px">CPU</div><div id="sys-cpu" style="font-size:24px;font-weight:600">—</div></div>
+          <div class="tile"><div class="muted" style="font-size:12px">Memory</div><div id="sys-mem" style="font-size:24px;font-weight:600">—</div></div>
+          <div class="tile"><div class="muted" style="font-size:12px">Docker disk</div><div id="sys-disk" style="font-size:24px;font-weight:600">—</div></div>
+        </div>
+        <div class="card" style="margin-top:12px"><header><h2>Services</h2><span class="grow"></span><button class="btn sm" onclick="loadSystem()">Refresh</button></header>
+          <div id="sys-services" class="tablewrap"><div class="empty">Loading…</div></div>
+        </div>
+        <div class="card" style="margin-top:12px"><header><h2>Live logs</h2><span class="grow"></span>
+          <select id="sys-log-pick" style="width:auto;min-width:180px" onchange="startLogStream(this.value)"></select>
+          <span class="termstatus" id="sys-log-status" style="margin-left:10px">—</span></header>
+          <div class="logpane" id="sys-logpane"><div class="empty">Pick a service to stream its logs.</div></div>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -330,12 +350,13 @@ let SOURCES=[], PKGCOUNTS={}, PKGSRC='mine', PKGHW=null, PKGVIEW=[], pkgGridSeq=
 let PKGLAYOUT=(localStorage.getItem('pkgLayout')||'grid'), PKGSORT=(localStorage.getItem('pkgSort')||'date');
 let SEL=new Set(), FTAGS=new Set();   // selected device uuids + active tag filters
 
-const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Your packages and the feeds you subscribe to'],package:['Package','Package detail'],remote:['Remote Access','Your SSH key, tunnel duration, and active sessions']};
+const TITLES={dashboard:['Dashboard','Fleet overview'],devices:['Devices','Provisioned devices and their update state'],device:['Device','Device detail'],packages:['Packages','Your packages and the feeds you subscribe to'],package:['Package','Package detail'],remote:['Remote Access','Your SSH key, tunnel duration, and active sessions'],system:['System','Services, resources, and live logs on the server']};
 function go(v){document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='v-'+v));
   const tt2=TITLES[v]||TITLES.devices;document.getElementById('ptitle').textContent=tt2[0];document.getElementById('psub').textContent=tt2[1];window.scrollTo(0,0);
   if(v==='packages')renderPackages();
-  if(v==='remote')renderRemote();}
+  if(v==='remote')renderRemote();
+  if(v==='system')loadSystem();else stopLogStream();}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-view]');if(a){e.preventDefault();go(a.dataset.view);}});
 function toggleTheme(){const r=document.documentElement;const cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',cur==='dark'?'light':'dark');}
 
@@ -1080,4 +1101,53 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProvision();});
 refreshAll();
 setInterval(()=>{if(document.getElementById('v-device').classList.contains('active'))return;loadDevices();},8000);
 setInterval(()=>{if(document.getElementById('v-remote').classList.contains('active'))loadRaSessions();},5000);
+
+// ---------- System page (ops sidecar: status + resources + live logs) ----------
+let _logES=null;
+function fmtMB(mb){return mb>=1024?(mb/1024).toFixed(1)+' GB':(mb||0)+' MB';}
+async function loadSystem(){
+  const svcEl=document.getElementById('sys-services');
+  let d;
+  try{ d=await api('/api/ops/status'); }
+  catch(e){
+    if(svcEl)svcEl.innerHTML='<div class="empty">Ops service not reachable — deploy the observability overlay (<span class="mono">compose.observability.yaml</span>).</div>';
+    ['sys-svc','sys-cpu','sys-mem','sys-disk'].forEach(id=>{const x=document.getElementById(id);if(x)x.textContent='—';});
+    return;
+  }
+  const t=d.totals||{};
+  document.getElementById('sys-svc').textContent=(t.up||0)+' / '+(t.total||0);
+  document.getElementById('sys-cpu').textContent=(t.cpu||0)+'%';
+  document.getElementById('sys-mem').textContent=fmtMB(t.mem_used_mb)+' / '+fmtMB(t.mem_total_mb);
+  document.getElementById('sys-disk').textContent=fmtMB((d.docker_disk||{}).total_mb);
+  const rows=d.services||[];
+  svcEl.innerHTML='<table><thead><tr><th>Service</th><th>State</th><th class="right">CPU</th><th class="right">Memory</th><th>Status</th></tr></thead><tbody>'+
+    rows.map(r=>{const ok=r.state==='running';
+      const dot='<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:'+(ok?'var(--ok)':'var(--bad)')+'"></span>';
+      return '<tr><td>'+dot+esc(r.service)+'</td><td class="'+(ok?'':'muted')+'">'+esc(r.state)+'</td><td class="mono right">'+(r.cpu||0)+'%</td><td class="mono right">'+fmtMB(r.mem_mb)+'</td><td class="muted">'+esc(r.status||'')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+  const pick=document.getElementById('sys-log-pick'),cur=pick.value,names=rows.map(r=>r.name);
+  pick.innerHTML='<option value="">Select a service…</option>'+rows.map(r=>'<option value="'+esc(r.name)+'">'+esc(r.service)+'</option>').join('');
+  if(cur&&names.includes(cur))pick.value=cur;
+}
+function stopLogStream(){ if(_logES){_logES.close();_logES=null;} }
+function startLogStream(name){
+  stopLogStream();
+  const pane=document.getElementById('sys-logpane'),status=document.getElementById('sys-log-status');
+  if(!name){pane.innerHTML='<div class="empty">Pick a service to stream its logs.</div>';status.textContent='—';status.className='termstatus';return;}
+  pane.innerHTML=''; status.textContent='connecting…'; status.className='termstatus';
+  const es=new EventSource('/api/ops/logs?name='+encodeURIComponent(name)+'&tail=300'); _logES=es;
+  es.onopen=()=>{status.textContent='streaming';status.className='termstatus ok';};
+  es.onmessage=(e)=>{
+    const atBottom=pane.scrollHeight-pane.scrollTop-pane.clientHeight<40;
+    const line=document.createElement('div'); line.className='ll';
+    const m=e.data.match(/^(\S+)\s([\s\S]*)$/);
+    if(m&&/\dT\d/.test(m[1]))line.innerHTML='<span class="lt">'+esc(m[1].replace('T',' ').replace(/\..*$/,''))+'</span>'+esc(m[2]);
+    else line.textContent=e.data;
+    pane.appendChild(line);
+    while(pane.childElementCount>2000)pane.removeChild(pane.firstChild);
+    if(atBottom)pane.scrollTop=pane.scrollHeight;
+  };
+  es.onerror=()=>{status.textContent='disconnected';status.className='termstatus bad';};
+}
+setInterval(()=>{const v=document.getElementById('v-system');if(v&&v.classList.contains('active'))loadSystem();},5000);
 </script>
