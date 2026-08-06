@@ -4,10 +4,10 @@
 #   curl -fsSL http://<server>:8080/provision-device.sh | sudo bash -s -- -s http://<server>:8080 [-n name]
 set -euo pipefail
 
-SERVER_URL=""; NAME=""; TOKEN=""; REPORTER=0
-usage(){ echo "usage: curl -fsSL <server>/provision-device.sh | sudo bash -s -- -s <server-url> [-n name] [-t token] [-r]"; }
-while getopts ":s:n:t:rh" o; do case $o in
-  s) SERVER_URL=$OPTARG;; n) NAME=$OPTARG;; t) TOKEN=$OPTARG;; r) REPORTER=1;; h) usage; exit 0;; \?) usage; exit 1;; esac; done
+SERVER_URL=""; NAME=""; TOKEN=""; REPORTER=0; REMOTE=0
+usage(){ echo "usage: curl -fsSL <server>/provision-device.sh | sudo bash -s -- -s <server-url> [-n name] [-t token] [-r] [-a]"; }
+while getopts ":s:n:t:rah" o; do case $o in
+  s) SERVER_URL=$OPTARG;; n) NAME=$OPTARG;; t) TOKEN=$OPTARG;; r) REPORTER=1;; a) REMOTE=1;; h) usage; exit 0;; \?) usage; exit 1;; esac; done
 
 [ -z "$SERVER_URL" ] && { echo "ERROR: -s <server-url> is required"; usage; exit 1; }
 [ "$(id -u)" -ne 0 ] && { echo "ERROR: run as root (pipe into 'sudo bash')"; exit 1; }
@@ -56,6 +56,54 @@ systemctl restart aktualizr
 if [ "$REPORTER" = "1" ]; then
   echo "== Installing the hardware reporter ..."
   curl -fsSL "$SERVER_URL/install-reporter.sh" | bash || echo "WARN: reporter install failed (device is still provisioned)"
+fi
+
+if [ "$REMOTE" = "1" ]; then
+  if command -v rac >/dev/null 2>&1; then
+    echo "== Enabling remote access (rac) ..."
+    RACDIR=/home/torizon/run/rac
+    mkdir -p /etc/rac "$RACDIR/uptane" /home/torizon/.ssh
+    rm -rf "$RACDIR/uptane"/*   # drop any stale TUF cache so rac re-pins this instance's root
+    chown -R torizon:torizon /home/torizon/run /home/torizon/.ssh 2>/dev/null || true
+    chmod 700 /home/torizon/.ssh 2>/dev/null || true
+    cat > /etc/rac/client.toml <<RAC
+[torizon]
+url = "${gwurl}/ras/"
+director_url = "${gwurl}/ras/director/"
+server_cert_path = "/var/sota/import/root.crt"
+client_cert_path = "/var/sota/import/client.pem"
+client_key_path = "/var/sota/import/pkey.pem"
+
+[device]
+ssh_private_key_path = "$RACDIR/device-key.sec"
+local_tuf_repo_path = "$RACDIR/uptane"
+unprivileged_user_group = "torizon:torizon"
+poll_timeout = { secs = 3, nanos = 0 }
+
+[device.session.target_host]
+host_port = "127.0.0.1:22"
+authorized_keys_path = "/home/torizon/.ssh/authorized_keys"
+RAC
+    cat > /etc/systemd/system/rac.service <<'SVC'
+[Unit]
+Description=Torizon Remote Access Client (OTA CE)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=CONFIG_FILE=/etc/rac/client.toml
+ExecStart=/usr/bin/rac
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SVC
+    systemctl daemon-reload
+    systemctl enable --now rac.service && echo "== Remote access enabled (persistent rac.service)"
+  else
+    echo "WARN: 'rac' not found — skipping remote access (it ships with Torizon OS)"
+  fi
 fi
 
 echo ""
