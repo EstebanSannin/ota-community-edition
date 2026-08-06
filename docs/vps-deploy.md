@@ -5,8 +5,10 @@ shared password over HTTPS. Single-tenant (one shared device list) for now — s
 for the multi-tenant / GitHub-login roadmap.
 
 ## 0. What you need
-- A small VPS. **Hetzner Cloud CX32** (4 vCPU / 8 GB / 80 GB, ~€7/mo) is the sweet spot — `ota-lith`
-  is a JVM app and likes RAM. CX22 (4 GB) works if tight. Debian 12/13.
+- A small VPS. **Hetzner Cloud CX33** (4 vCPU Intel / 8 GB / 80 GB NVMe / 20 TB, ~€8.49/mo) is the
+  sweet spot — `ota-lith` is a JVM app and likes RAM. The 4 GB tier one step down works if tight.
+  (An Arm CAX plan is a bit cheaper and fine too — our images are multi-arch.) Debian 12/13.
+  Order at https://console.hetzner.com/ .
 - A **domain** (or subdomain) you control, e.g. `ota.example.com`, with an **A record → the VPS IP**.
   Used for the console (real HTTPS cert) and the SSH bastion.
 
