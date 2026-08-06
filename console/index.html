@@ -315,7 +315,10 @@ const rapi=p=>'/api/reposerver/user_repo/'+p;
 const dapi=p=>'/api/device-registry/'+p;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtTime=t=>t?new Date(t).toLocaleString():'—';
-const relTime=t=>{if(!t)return'—';const s=(Date.now()-new Date(t))/1000;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h ago';return Math.floor(s/86400)+' d ago';};
+const relTime=t=>{if(!t)return'—';let s=(Date.now()-new Date(t))/1000;const fut=s<0;s=Math.abs(s);
+  if(s<45)return'just now';
+  let v;if(s<3600)v=Math.floor(s/60)+' min';else if(s<86400)v=Math.floor(s/3600)+' h';else v=Math.floor(s/86400)+' d';
+  return fut?('in '+v):(v+' ago');};
 const shortHash=h=>h?h.slice(0,12):'';
 const bytes=n=>{n=+n;if(!n||n<0)return null;const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (n>=100?Math.round(n):n.toFixed(1))+' '+u[i];};
 let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600);}
@@ -444,7 +447,7 @@ function showRemoteModal(r){
     <div class="mbody">
       <p class="mmsg" style="margin:0 0 10px">Run this on your computer — the device connects within a few seconds:</p>
       <div class="cmdbox"><code id="ra-cmd"></code><button class="btn sm" id="ra-copy">Copy</button></div>
-      <p class="muted" style="font-size:12px;margin:10px 0 0">Authorized with your saved SSH key. Session expires ${r.expires_at?relTime(r.expires_at).replace('ago','from now'):'in 30 min'}. Reverse port ${esc(String(r.reverse_port||''))}.</p>
+      <p class="muted" style="font-size:12px;margin:10px 0 0">Authorized with your saved SSH key. Session expires ${r.expires_at?relTime(r.expires_at):'in 30 min'}. Reverse port ${esc(String(r.reverse_port||''))}.</p>
     </div>
     <footer><button class="btn dbad" id="ra-stop">Stop remote access</button><span class="grow"></span><button class="btn" id="ra-web">⧉ Open web terminal</button><button class="btn mok primary">Done</button></footer></div>`;
   ov.querySelector('#ra-cmd').textContent=cmd;
@@ -515,7 +518,7 @@ async function loadRaSessions(){
   if(!vals.length){el.innerHTML='<div class="empty">No active sessions. Open a device and click “Remote access”.</div>';return;}
   el.innerHTML=`<table><thead><tr><th>Device</th><th>Reverse port</th><th>Expires</th><th class="right">Action</th></tr></thead><tbody>${vals.map(s=>{
     const d=DEVICES.find(x=>x.uuid===s.uuid);const nm=d?(d.deviceName||d.deviceId):s.uuid;
-    const exp=s.expires_at?relTime(s.expires_at).replace(' ago',' left'):'—';
+    const exp=s.expires_at?relTime(s.expires_at):'—';
     const nmj=esc(nm).replace(/'/g,"\\'");
     return `<tr><td><div class="dev"><span class="av" style="width:28px;height:28px;border-radius:7px">${avatar}</span><div class="nm">${esc(nm)}</div></div></td><td class="mono">${esc(String(s.reverse_port))}</td><td class="muted">${esc(exp)}</td><td class="right"><button class="btn sm" onclick="openTerminal('${esc(s.uuid)}','${nmj}')">Terminal</button> <button class="btn sm danger" onclick="killSession('${esc(s.uuid)}')">Kill</button></td></tr>`;
   }).join('')}</tbody></table>`;
