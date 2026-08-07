@@ -117,3 +117,66 @@ Device enrollment must keep working without a login — worth re-checking after 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://ota.samnium.tech/provision-device.sh   # expect 200
 ```
+
+---
+
+# Alternative: local user accounts (offline)
+
+GitHub sign-in needs the internet and a GitHub account per operator. For a LAN or air-gapped
+instance — or anywhere you don't want that dependency — use **local users** instead: per-user,
+revocable accounts stored on the instance itself, with no external identity provider.
+
+This is a third front mode, sitting beside "none" (open, for a trusted LAN) and GitHub. The console
+itself is unchanged in all three — login lives entirely in Caddy, which delegates to the small `auth`
+sidecar via `forward_auth`.
+
+## How it fits together
+
+```
+browser ──https──▶ Caddy ──forward_auth──▶ auth sidecar   (session cookie? 2xx allow : 302 /login)
+                     │                       └ /login, /logout, /auth/api/users …
+                     ├── /provision-device.sh, /api/provision …  (device enrollment: NOT gated)
+                     └── /tuf/*  (tooling: bearer-token, NOT gated)
+                                  everything else ──▶ console
+```
+
+## Turn it on
+
+Set `AUTH_MODE=local` in `.env`, plus `LOCAL_TLS=1` if you have no public DNS / Let's Encrypt (Caddy
+then issues its own certificate from a built-in CA). Re-render the Caddyfile and bring the overlay up:
+
+```bash
+cd /opt/ota-community-edition
+printf 'AUTH_MODE=local\nLOCAL_TLS=1\nRAS_PUBLIC_HOST=ota.local\n' | sudo tee -a .env
+AUTH_MODE=local LOCAL_TLS=1 scripts/provision-vps.sh          # or just re-render caddy/Caddyfile
+sudo docker compose -f compose.release.yaml -f compose.public.yaml -f compose.auth.yaml \
+  --env-file .env up -d
+```
+
+On first start, if no users exist, an **admin** account is created with a random password printed
+**once** to the logs — log in and change it from the **Users** page:
+
+```bash
+docker logs ota-community-edition-auth-1 | grep -A2 'initial administrator'
+```
+
+(Set `AUTH_ADMIN_PASSWORD` in `.env` to choose that first password instead of a random one.)
+
+## Managing users
+
+The console gains a **Users** section (visible only when local-users auth is in front): add a user,
+reset a password, or delete one. Deleting a user — or resetting their password — **ends their active
+sessions immediately**, not just their next login. The last remaining user cannot be deleted, so you
+can't lock everyone out.
+
+## Notes
+
+- **Session cookies are `Secure`** (HTTPS-only), so this mode assumes a TLS front — which
+  `LOCAL_TLS=1` gives you offline. For a plain-HTTP test only, set `AUTH_COOKIE_SECURE=0`.
+- **Passwords** are stored salted + hashed (scrypt, or PBKDF2 where scrypt is unavailable), never in
+  plain text. The database lives in the `auth-data` volume — back it up with the rest of your state.
+- Device enrollment and the `/tuf` tooling path bypass the login in this mode too, so provisioning
+  and `torizoncore-builder` keep working regardless of who can log in.
+- Reaching it from another machine on the LAN: point that machine's DNS/hosts at the instance for
+  the name in `RAS_PUBLIC_HOST` (e.g. `192.168.64.2 ota.local`) and trust Caddy's local root CA (or
+  accept the browser warning once).

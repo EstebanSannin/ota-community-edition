@@ -34,10 +34,13 @@ Everything else is small and deliberately boring — **stdlib-only Python sideca
 | `reverse-proxy` | 80 | internal host-based router to the ota-lith ports |
 | `caddy` | 80/443 | public TLS + login (only in the VPS deploy) |
 
-Two separate auth planes, and they are easy to confuse: **humans** sign in with GitHub via
-oauth2-proxy; **tooling** (torizoncore-builder/garage-sign) uses a client-credentials token from our
-own endpoint, because GitHub cannot serve that grant. See [docs/console-auth.md](docs/console-auth.md)
-and [docs/tooling-credentials.md](docs/tooling-credentials.md).
+Two separate auth planes, and they are easy to confuse: **humans** sign in to the console;
+**tooling** (torizoncore-builder/garage-sign) uses a client-credentials token from our own endpoint,
+because GitHub cannot serve that grant. Human login has three swappable front modes, all in Caddy so
+the console stays user-agnostic: **none** (trusted LAN), **local users** (`AUTH_MODE=local`, the
+`auth` sidecar — offline-capable, per-user, revocable), and **GitHub** (`GITHUB_CLIENT_ID`, via
+oauth2-proxy). See [docs/console-auth.md](docs/console-auth.md) and
+[docs/tooling-credentials.md](docs/tooling-credentials.md).
 
 ## Commands
 
