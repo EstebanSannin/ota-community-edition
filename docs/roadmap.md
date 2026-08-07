@@ -49,9 +49,15 @@ that stopped reporting is invisible in the current UI.
 
 ## Operational debt
 
-**Push the patched `ota-lith` image to a registry.** The VPS currently runs a *locally built* image
-carrying the non-AWS S3 endpoint patch, so `docker compose pull` would silently revert it. Building
-and pushing multi-arch (`release.sh`) removes the trap.
+**~~Push the patched `ota-lith` image to a registry.~~ Done — 0.2.0, 2026-08-07.** All five images
+(`ota-lith`, `ota-ce-provisioner`, `ota-ce-lockbox`, `ota-ce-ops`, `ras`) are now published multi-arch
+as `0.2.0` and `latest`; the S3 patch is verified present in the published jar. Note the three
+sidecars had **never** been pushed before, and `ras` has no `build:` fallback, so a fresh deploy
+elsewhere previously could not obtain it at all.
+
+Remaining: the VPS is still *running* its locally-built `ota-lith` (identical content, different
+image id). Repointing it at the registry image is a `pull` + recreate — cheap, but it briefly
+interrupts device polling and needs the nginx proxies restarted afterwards.
 
 **Pin the MinIO image.** `compose.s3.yaml` uses `minio/minio:latest` while everything else is pinned
 (`nginx:1.27`, `mariadb:10.11`). Pin it once a known-good release tag is confirmed.

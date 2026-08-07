@@ -87,9 +87,12 @@ Each of these cost real debugging time. They are not style preferences.
 3. **Recreating `ota-lith` changes its container IP, and the nginx proxies cache the old one.**
    `console`, `reverse-proxy` and `gateway` then 502 — *including for devices*. Always:
    `docker restart ota-community-edition-{console,reverse-proxy,gateway}-1`.
-4. **Do not `docker compose pull ota-lith` on the VPS.** That image is a **local build** carrying the
-   patch that lets the reposerver use a non-AWS S3 endpoint. Pulling silently reverts it and only
-   local-disk storage will work. Rollback tag: `samnite/ota-lith:prerollback-s3`.
+4. **`ota-lith` carries a local patch — check the registry image has it before pulling.** The
+   reposerver is patched to accept a non-AWS S3 endpoint; an unpatched image silently supports only
+   local-disk storage. `samnite/ota-lith:0.2.0`/`:latest` **do** contain it (verified 2026-08-07), so
+   pulling is safe today. If you ever rebuild from a machine whose tree lacks the patch, you can undo
+   that guarantee. Rollback tag on the VPS: `samnite/ota-lith:prerollback-s3`. Verify with:
+   `python3 -c "import zipfile;print(b'publicEndpointUrl' in zipfile.ZipFile('repo.jar').read('com/advancedtelematic/tuf/reposerver/target_store/S3TargetStoreEngine.class'))"`
 5. **Single-file bind mounts pin the inode.** After editing `console/index.html` or an `nginx.conf`
    on the host, `docker restart` the container or it keeps serving the old file. Directory mounts
    (`console/js/`) pick changes up on their own.

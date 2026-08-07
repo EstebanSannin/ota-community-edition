@@ -194,10 +194,10 @@ docker compose -f compose.release.yaml -f compose.public.yaml -f compose.oauth2.
 
 Two things that will bite you:
 
-- **`ota-lith` here is a locally-built image**, not the one on Docker Hub — it carries the patch
-  that lets the reposerver talk to a non-AWS S3 endpoint. **Do not `docker compose pull ota-lith`**
-  until that patch is pushed to the registry, or you will silently roll back to a build whose only
-  working storage backend is local disk. Rebuild it with:
+- **`ota-lith` carries a patch** that lets the reposerver talk to a non-AWS S3 endpoint. As of
+  **0.2.0 this patch is in the published image**, so `docker compose pull` is safe (before 0.2.0 it
+  would have silently rolled back to a build whose only working storage backend was local disk).
+  Rebuild it locally with:
 
   ```bash
   docker run --rm -v /opt/ota-community-edition:/src -w /src \
