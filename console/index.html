@@ -114,6 +114,16 @@
             <span class="mono">update</span> folder on the device. The bundle includes a README with the exact steps.</span></p>
           <div class="tablewrap" id="lb-list"><div class="empty">Loading…</div></div>
         </div>
+
+        <div class="card"><header><h2>Tooling credentials</h2><span class="grow"></span>
+          <button class="btn sm" onclick="loadCredential()">Refresh</button>
+        </header>
+          <p class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+            <span>The equivalent of Torizon Cloud's <span class="mono">credentials.zip</span>, for this instance.
+            <span class="mono">torizoncore-builder</span> needs it to <b>canonicalize</b> a compose file — pinning every
+            image by digest, which a lockbox requires. See <span class="mono">docs/tooling-credentials.md</span>.</span></p>
+          <div class="tablewrap" id="cred-body"><div class="empty">Loading…</div></div>
+        </div>
       </section>
 
       <section class="view" id="v-system">
