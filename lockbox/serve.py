@@ -78,17 +78,36 @@ def lockbox_targets(name):
     return signed.get("targets", {}), signed.get("expires", "")
 
 
+def add_root_chain(z, dest, base, latest):
+    """Write root.json plus every earlier version.
+
+    A consumer only trusts a new root if it can walk the rotation chain from the version it
+    already has, and the device's Secondaries may sit on an older root than the Primary — so
+    ship 1.root.json … N.root.json, not just the latest.
+    """
+    z.writestr(f"{dest}/root.json", latest)
+    version = json.loads(latest).get("signed", {}).get("version", 1)
+    for v in range(1, version + 1):
+        try:
+            z.writestr(f"{dest}/{v}.root.json", fetch(f"{base}/{v}.root.json"))
+        except urllib.error.HTTPError:
+            pass                            # a gap in the chain is the server's business, not ours
+
+
 def build_zip(name):
     targets, _ = lockbox_targets(name)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         d = f"{BUNDLE_DIR}/metadata/director"
-        z.writestr(f"{d}/root.json", fetch(f"{DIRECTOR}/admin/repo/root.json"))
+        add_root_chain(z, d, f"{DIRECTOR}/admin/repo", fetch(f"{DIRECTOR}/admin/repo/root.json"))
         z.writestr(f"{d}/offline-snapshot.json", fetch(f"{DIRECTOR}/admin/repo/offline-snapshot.json"))
         z.writestr(f"{d}/{name}.json", fetch(f"{DIRECTOR}/admin/repo/offline-updates/{name}.json"))
+        ir = f"{BUNDLE_DIR}/metadata/image-repo"
+        add_root_chain(z, ir, f"{REPOSERVER}/user_repo", fetch(f"{REPOSERVER}/user_repo/root.json"))
         for role in IMAGE_REPO_ROLES:
-            z.writestr(f"{BUNDLE_DIR}/metadata/image-repo/{role}",
-                       fetch(f"{REPOSERVER}/user_repo/{role}"))
+            if role == "root.json":
+                continue                    # already written with its chain above
+            z.writestr(f"{ir}/{role}", fetch(f"{REPOSERVER}/user_repo/{role}"))
         for filename in targets:
             safe = filename.replace("..", "_").lstrip("/")
             z.writestr(f"{BUNDLE_DIR}/images/{safe}",
