@@ -1,6 +1,7 @@
 package com.advancedtelematic.tuf.reposerver.target_store
 
 import java.io.File
+import java.net.URI
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 import java.util.Date
@@ -75,6 +76,8 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
   }
 
   private lazy val s3client = s3ClientFor(credentials.endpointUrl)
+
+  private val s3Compatible = credentials.endpointUrl.isDefined
 
   // Pre-signed URLs are handed out to clients that live outside our network, so they must be
   // signed for a host those clients can actually reach (the signature covers the Host header).
@@ -205,13 +208,21 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
 
     FastFuture.successful {
       val req = new GeneratePresignedUrlRequest(bucketId, objectId, HttpMethod.PUT)
-      req.putCustomRequestHeader("Content-Length", length.toString)
+      if (!s3Compatible) req.putCustomRequestHeader("Content-Length", length.toString)
       req.setExpiration(expiresAt)
-      val url = signingClient.generatePresignedUrl(req)
+      val url = presign(req)
       log.debug(s"Signed s3 url for $objectId")
-      url.toString
+      url
     }
   }
+
+  /* Sign a URL, and percent-encode the semicolons the AWS signer leaves raw in
+   * X-Amz-SignedHeaders (`content-length;host`). AWS itself accepts them, but Go's net/url treats
+   * a bare ';' in a query string as an error, so an S3-compatible store written in Go (MinIO)
+   * rejects the request outright with "invalid semicolon separator in query". The encoding is
+   * transparent to the signature: the server decodes the value before verifying it. */
+  private def presign(req: GeneratePresignedUrlRequest): String =
+    signingClient.generatePresignedUrl(req).toString.replace(";", "%3B")
 
   override def initiateMultipartUpload(
     repoId: RepoId,
@@ -234,9 +245,15 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
     val req = new GeneratePresignedUrlRequest(bucketId, objectId, HttpMethod.PUT)
     req.addRequestParameter("uploadId", uploadId.value)
     req.addRequestParameter("partNumber", partNumber)
-    req.setContentMd5(md5)
-    req.putCustomRequestHeader(Headers.CONTENT_LENGTH, contentLength.toString)
-    Try(signingClient.generatePresignedUrl(req)).map(GetSignedUrlResult.apply)
+    // Signing content-md5/content-length makes X-Amz-SignedHeaders a semicolon-separated list,
+    // which a Go-based store rejects outright - see presign(). The client sends both headers
+    // regardless, and S3 semantics still have the store verify Content-MD5 against the body when
+    // the header is present, so dropping them from the *signature* keeps the integrity check.
+    if (!s3Compatible) {
+      req.setContentMd5(md5)
+      req.putCustomRequestHeader(Headers.CONTENT_LENGTH, contentLength.toString)
+    }
+    Try(presign(req)).map(url => GetSignedUrlResult(new URI(url)))
   }
 
   override def completeMultipartUpload(repoId: RepoId,
