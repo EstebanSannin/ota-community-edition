@@ -1,0 +1,43 @@
+# Local-users login overlay — per-user, revocable accounts stored on the instance itself, with no
+# external identity provider. This is the offline-capable alternative to the GitHub sign-in
+# (compose.oauth2.yaml): use it for a LAN / air-gapped deployment, or any instance where you don't
+# want to depend on GitHub.
+#
+# Layer it on top of the release (+ public) compose, and render the Caddyfile in local-users mode:
+#
+#   AUTH_MODE=local LOCAL_TLS=1 RAS_PUBLIC_HOST=ota.local scripts/provision-vps.sh
+#   docker compose -f compose.release.yaml -f compose.public.yaml -f compose.auth.yaml \
+#     --env-file .env up -d
+#
+# Caddy delegates every request to this service via forward_auth; the console stays user-agnostic.
+# On first start, if no users exist, an 'admin' account is created with a random password printed
+# ONCE to the container logs (docker logs ota-community-edition-auth-1) — log in and change it from
+# the Users page. Set AUTH_ADMIN_PASSWORD in .env to choose that first password instead.
+#
+# NOTE: session cookies are Secure (HTTPS-only), so this mode assumes a TLS front (Caddy, incl.
+# LOCAL_TLS=1 self-signed). For a plain-HTTP test only, set AUTH_COOKIE_SECURE=0.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  auth:
+    image: ${OTA_CE_NS:-samnite}/ota-ce-auth:${OTA_CE_TAG:-latest}
+    build: ./auth
+    restart: always
+    logging: *default-logging
+    environment:
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-1}
+      AUTH_SESSION_TTL: ${AUTH_SESSION_TTL:-43200}
+      AUTH_ADMIN_USER: ${AUTH_ADMIN_USER:-admin}
+      # Optional: pin the first-run admin password instead of a random one printed to the logs.
+      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD:-}
+    volumes:
+      - auth-data:/data          # the user database (passwords stored salted + hashed)
+    expose:
+      - "9930"                   # internal only — reached by the Caddy front, never published
+
+volumes:
+  auth-data:

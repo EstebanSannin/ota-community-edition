@@ -99,8 +99,14 @@ fi
 render_caddyfile() {
   mkdir -p "$APP_DIR/caddy"
   {
-    printf '{\n\temail %s\n}\n\n' "$ACME_EMAIL"
+    # LOCAL_TLS=1 makes Caddy issue its own certificate from a built-in CA (`tls internal`) instead
+    # of Let's Encrypt -- for a LAN / air-gapped instance with no public DNS and no internet. Trust
+    # Caddy's root once (it prints where) or use --cacert / -k when testing.
+    if [ "${LOCAL_TLS:-}" != "1" ]; then
+      printf '{\n\temail %s\n}\n\n' "$ACME_EMAIL"
+    fi
     printf '%s {\n' "$RAS_PUBLIC_HOST"
+    [ "${LOCAL_TLS:-}" = "1" ] && printf '\ttls internal\n'
     printf '\t@provision path /provision-device.sh /install-reporter.sh /api/provision /api/provision/*\n'
     printf '\thandle @provision {\n\t\treverse_proxy console:80\n\t}\n'
     # Tooling (torizoncore-builder / garage-sign) authenticates with a bearer token from
@@ -124,7 +130,14 @@ render_caddyfile() {
       # meaningless here anyway -- the pre-signed query is what authorises the PUT.
       printf '\thandle @s3 {\n\t\treverse_proxy minio:9000 {\n\t\t\theader_up -Authorization\n\t\t}\n\t}\n'
     fi
-    if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+    if [ "${AUTH_MODE:-}" = "local" ]; then
+      # Local user accounts (offline-capable). The auth sidecar serves the login form + admin API
+      # on public paths; everything else is gated by forward_auth, which bounces unauthenticated
+      # browsers to /login and returns 401 to API callers.
+      printf '\t@authpub path /login /logout /auth/*\n'
+      printf '\thandle @authpub {\n\t\treverse_proxy auth:9930\n\t}\n'
+      printf '\thandle {\n\t\tforward_auth auth:9930 {\n\t\t\turi /auth/verify\n\t\t\tcopy_headers X-Auth-User\n\t\t}\n\t\tencode gzip\n\t\treverse_proxy console:80\n\t}\n'
+    elif [ -n "${GITHUB_CLIENT_ID:-}" ]; then
       printf '\thandle {\n\t\tencode gzip\n\t\treverse_proxy oauth2-proxy:4180\n\t}\n'
     else
       printf '\thandle {\n\t\tencode gzip\n\t\tbasic_auth {\n\t\t\t%s %s\n\t\t}\n\t\treverse_proxy console:80\n\t}\n' \
@@ -144,6 +157,8 @@ if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
     # gives 44 chars and is REJECTED ("must be 16, 24, or 32 bytes").
     echo "OAUTH_COOKIE_SECRET=$(openssl rand -hex 16)" >> "$APP_DIR/.env"
   fi
+  render_caddyfile
+elif [ "${AUTH_MODE:-}" = "local" ]; then
   render_caddyfile
 elif [ -n "$CONSOLE_PASSWORD_HASH" ]; then
   render_caddyfile

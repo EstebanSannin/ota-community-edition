@@ -5,6 +5,7 @@ import { loadTargets, loadSources } from './views/packages.js';
 import { loadRaSessions } from './views/remote.js';
 import { loadSystem } from './views/system.js';
 import { closeProvision } from './views/provision.js';
+import { loadMe } from './views/users.js';
 import './views/device.js';
 import './views/lockbox.js';
 import './router.js';
@@ -14,6 +15,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProvision();});
 
 expose({ refreshAll });   // the topbar refresh button
 
+loadMe();      // reveals the Users nav + "signed in as" widget only when local-users auth is in front
 refreshAll();
 
 // live refresh — each tick no-ops unless its view is on screen

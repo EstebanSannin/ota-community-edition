@@ -19,6 +19,7 @@
       <a data-view="remote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>Remote Access<span class="badge" id="nav-ra">0</span></a>
       <a data-view="lockbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>Offline updates<span class="badge" id="nav-lb">0</span></a>
       <a data-view="system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 5h16v10H4z"/><path d="M2 19h20M9 15v4M15 15v4"/></svg>System<span class="badge" id="nav-sys"></span></a>
+      <a data-view="users" id="nav-users-link" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Users</a>
       <a href="apidocs/" target="_blank" rel="noopener" title="Open the API reference in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M9 9h.01M12 9h.01M8 13h8"/></svg>API<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;margin-left:auto;opacity:.6"><path d="M14 3h7v7M21 3l-9 9M5 5h5M5 5v14h14v-5"/></svg></a>
     </nav>
     <div class="foot"><span class="dot" id="dot"></span> <span id="status">connecting…</span></div>
@@ -28,6 +29,10 @@
     <div class="topbar">
       <div><h1 id="ptitle">Dashboard</h1><div class="sub" id="psub">Fleet overview</div></div>
       <div class="spacer"></div>
+      <span id="whoami" style="display:none;align-items:center;gap:8px;margin-right:4px;font-size:13px">
+        <span class="muted">Signed in as <b id="whoami-name"></b></span>
+        <button class="btn sm" onclick="logout()">Log out</button>
+      </span>
       <button class="btn primary" onclick="openProvision()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Provision device</button>
       <button class="iconbtn" title="Refresh" onclick="refreshAll()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 4v6h6M20 20v-6h-6"/><path d="M20 10a8 8 0 0 0-14-3M4 14a8 8 0 0 0 14 3"/></svg></button>
       <button class="iconbtn" title="Theme" onclick="toggleTheme()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg></button>
@@ -153,6 +158,18 @@
           <select id="sys-log-pick" style="width:auto;min-width:180px" onchange="startLogStream(this.value)"></select>
           <span class="termstatus" id="sys-log-status" style="margin-left:10px">—</span></header>
           <div class="logpane" id="sys-logpane"><div class="empty">Pick a service to stream its logs.</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="v-users">
+        <div class="card"><header><h2>Users</h2><span class="count" id="users-count">0</span><span class="grow"></span>
+          <button class="btn sm" onclick="loadUsers()">Refresh</button>
+          <button class="btn sm primary" onclick="openAddUser()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add user</button>
+        </header>
+          <p class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+            <span>Console accounts stored on this instance — no external identity provider, so they work
+            fully offline. Each person gets their own password and can be revoked individually.</span></p>
+          <div class="tablewrap" id="users-list"><div class="empty">Loading…</div></div>
         </div>
       </section>
     </div>
