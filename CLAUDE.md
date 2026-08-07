@@ -130,3 +130,17 @@ reasoning that it should work**. A change is done when it has been exercised end
 verification fails, find out *why* before concluding it is unrelated: a failure that looks like a
 regression has more than once been pre-existing device state, and the reverse is also true. Say
 plainly what was verified and what was not.
+
+**Run the smoke test before and after any change that could touch the core loop** (the stack,
+storage, the reposerver/director/provisioner/lockbox, the console proxy, or a compose/overlay
+change). It brings up the plain LAN stack and checks provision → publish → read-back → lockbox with
+no device needed:
+
+```bash
+UP=1 BASE=http://192.168.64.2:8080 bash scripts/smoke-test.sh   # on the test VM
+```
+
+"Before" gives you a known-good baseline so you can tell what a failure actually means; skipping it
+is how you end up unable to say whether *your* change broke something or it was already broken. This
+is not optional ceremony — it exists because we have shipped things (an opt-in that reasoned-correct
+but was never run on the default path) without ever exercising the path they could break.

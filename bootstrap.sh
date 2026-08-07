@@ -63,11 +63,12 @@ fi
 echo "   healthy."
 
 say "6/6  Initializing the TUF repository"
-# Talk to the reverse-proxy on localhost:80 via Host headers, so no /etc/hosts entry is needed.
-api(){ curl -sS -H "Host: $1" -H "x-ats-namespace: default" "${@:2}"; }
-api reposerver.ota.ce -X POST http://localhost/api/v1/user_repo   >/dev/null 2>&1 || true
-api director.ota.ce   -X POST http://localhost/api/v1/admin/repo  >/dev/null 2>&1 || true
-code=$(api reposerver.ota.ce -o /dev/null -w '%{http_code}' http://localhost/api/v1/user_repo/root.json)
+# Go through the console proxy on :8080, which is published in BOTH dev and release modes. (The
+# reverse-proxy's port 80 is only published by ota-ce.yaml; compose.release.yaml keeps it internal,
+# so the old localhost:80 path silently failed to initialise TUF on a release bring-up.)
+curl -sS -X POST http://localhost:8080/api/reposerver/user_repo      >/dev/null 2>&1 || true
+curl -sS -X POST http://localhost:8080/api/director/admin/repo       >/dev/null 2>&1 || true
+code=$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/api/reposerver/user_repo/root.json)
 echo "   user_repo/root.json -> $code"
 
 cat <<EOF
