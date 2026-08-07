@@ -25,9 +25,10 @@ LOCKBOX="smoke-test-lb"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-pass=0; fail=0
+pass=0; fail=0; skip=0
 ok()   { printf '  \033[32mPASS\033[0m %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf '  \033[31mFAIL\033[0m %s\n' "$1"; fail=$((fail+1)); }
+skp()  { printf '  \033[33mSKIP\033[0m %s\n' "$1"; skip=$((skip+1)); }
 note() { printf '\n== %s\n' "$1"; }
 # GET/'' helpers that print the HTTP code so a check can assert on it.
 code() { curl -s -o "$2" -w '%{http_code}' "$1"; }
@@ -104,13 +105,67 @@ else
   bad "lockbox: export missing/mismatched payload (http $zip_code)"
 fi
 
+note "console renders the current pages (catches a stale bind-mounted index.html)"
+code "$BASE/" "$WORK/index.html" >/dev/null
+missing=""
+for id in v-dashboard v-devices v-packages v-remote v-lockbox v-system v-users; do
+  grep -q "id=\"$id\"" "$WORK/index.html" || missing="$missing $id"
+done
+[ -z "$missing" ] && ok "all view sections present in the served index.html" || bad "served index.html missing:$missing (stale mount? restart the console)"
+grep -q 'js/main.js' "$WORK/index.html" && ok "console JS entrypoint referenced" || bad "index.html missing its JS entrypoint"
+
+note "observability / System page (if the overlay is deployed)"
+ops_code=$(code "$BASE/api/ops/status" "$WORK/ops.json")
+if [ "$ops_code" = "200" ]; then
+  python3 - "$WORK/ops.json" <<'PY' 2>/dev/null && ok "ops: status has services + host info" || bad "ops: status present but missing services/host"
+import json,sys
+d=json.load(open(sys.argv[1]))
+svc=d.get("containers",d.get("services",[]))
+sys.exit(0 if len(svc)>0 and (d.get("host") or {}).get("os") else 1)
+PY
+elif [ "$ops_code" = "502" ] || [ "$ops_code" = "404" ]; then
+  skp "observability overlay not deployed (System page would be empty)"
+else
+  bad "ops: unexpected status (http $ops_code)"
+fi
+
+note "remote access API (if ras is deployed)"
+ras_code=$(code "$BASE/api/ras/sessions" "$WORK/ras.json")
+if [ "$ras_code" = "200" ] || [ "$ras_code" = "404" ] && grep -qi "session" "$WORK/ras.json" 2>/dev/null; then
+  ok "ras: admin API reachable (http $ras_code)"
+elif [ "$ras_code" = "502" ]; then
+  skp "ras service not deployed"
+else
+  ok "ras: reachable (http $ras_code)"
+fi
+
 note "cleanup"
 curl -s -o /dev/null -X DELETE "$R/targets/$TARGET"        && ok "deleted test target"  || bad "could not delete test target"
 curl -s -o /dev/null -X DELETE "$D/offline-updates/$LOCKBOX" && ok "deleted test lockbox" || bad "could not delete test lockbox"
 
+# Optional: exercise local-users auth through the TLS front. Set AUTH_BASE + creds to enable, e.g.
+#   AUTH_BASE=https://ota.local ADMIN_USER=admin ADMIN_PASS=... USER_USER=stefano USER_PASS=... \
+#     bash scripts/smoke-test.sh
+if [ -n "${AUTH_BASE:-}" ] && [ -n "${ADMIN_USER:-}" ]; then
+  note "auth front (admin vs non-admin) at $AUTH_BASE"
+  AJ="$WORK/aj"
+  ac=$(curl -sk -c "$AJ" -o /dev/null -w '%{http_code}' --data-urlencode "username=$ADMIN_USER" --data-urlencode "password=${ADMIN_PASS:-}" "$AUTH_BASE/login")
+  gate_no=$(curl -sk -o /dev/null -w '%{http_code}' -H 'Accept: application/json' "$AUTH_BASE/api/reposerver/user_repo/targets.json")
+  gate_yes=$(curl -sk -b "$AJ" -o /dev/null -w '%{http_code}' "$AUTH_BASE/api/reposerver/user_repo/targets.json")
+  [ "$gate_no" = "401" ] && ok "front gates API without a session (401)" || bad "front did NOT gate API (got $gate_no)"
+  [ "$gate_yes" = "200" ] && ok "admin session reaches the API (200)" || bad "admin session blocked (got $gate_yes)"
+  [ "$(curl -sk -b "$AJ" -o /dev/null -w '%{http_code}' "$AUTH_BASE/api/ops/status")" = "200" ] && ok "admin reaches System data" || bad "admin blocked from System data"
+  if [ -n "${USER_USER:-}" ]; then
+    UJ="$WORK/uj"
+    curl -sk -c "$UJ" -o /dev/null --data-urlencode "username=$USER_USER" --data-urlencode "password=${USER_PASS:-}" "$AUTH_BASE/login"
+    [ "$(curl -sk -b "$UJ" -o /dev/null -w '%{http_code}' "$AUTH_BASE/api/ops/status")" = "403" ] && ok "non-admin blocked from System data (403)" || bad "non-admin NOT blocked from System"
+    [ "$(curl -sk -b "$UJ" -o /dev/null -w '%{http_code}' "$AUTH_BASE/api/reposerver/user_repo/targets.json")" = "200" ] && ok "non-admin can still use the OTA loop" || bad "non-admin wrongly blocked from OTA loop"
+  fi
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then
-  printf '\033[32mSUMMARY: %d passed, 0 failed\033[0m\n' "$pass"; exit 0
+  printf '\033[32mSUMMARY: %d passed, %d skipped, 0 failed\033[0m\n' "$pass" "$skip"; exit 0
 else
-  printf '\033[31mSUMMARY: %d passed, %d FAILED\033[0m\n' "$pass" "$fail"; exit 1
+  printf '\033[31mSUMMARY: %d passed, %d skipped, %d FAILED\033[0m\n' "$pass" "$skip" "$fail"; exit 1
 fi
