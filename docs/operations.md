@@ -177,3 +177,41 @@ docker compose -f compose.release.yaml -f compose.public.yaml -f compose.observa
 
 Everything the System page shows is also available from the CLI (sections 1–4 above); the page
 is just a convenience layer over the same Docker data.
+
+## 9. Object storage for targets (S3 / MinIO)
+
+The public instance keeps TUF targets in a bundled MinIO rather than on local disk, because
+out-of-band uploads — `torizoncore-builder platform push` — are refused by the local-disk backend.
+See [tooling-credentials.md](tooling-credentials.md) for the full workflow; the overlay is
+`compose.s3.yaml` and it is enabled by setting `MINIO_ROOT_PASSWORD` in `.env`.
+
+The full deploy line for this instance is therefore:
+
+```bash
+docker compose -f compose.release.yaml -f compose.public.yaml -f compose.oauth2.yaml \
+  -f compose.observability.yaml -f compose.s3.yaml --env-file .env up -d
+```
+
+Two things that will bite you:
+
+- **`ota-lith` here is a locally-built image**, not the one on Docker Hub — it carries the patch
+  that lets the reposerver talk to a non-AWS S3 endpoint. **Do not `docker compose pull ota-lith`**
+  until that patch is pushed to the registry, or you will silently roll back to a build whose only
+  working storage backend is local disk. Rebuild it with:
+
+  ```bash
+  docker run --rm -v /opt/ota-community-edition:/src -w /src \
+    -v ota-sbt-cache:/root/.cache -v ota-sbt-ivy:/root/.ivy2 -v ota-sbt-sbt:/root/.sbt \
+    -e SBT_OPTS=-Xmx3g sbtscala/scala-sbt:eclipse-temurin-jammy-21.0.2_13_1.9.9_3.4.1 \
+    sbt -batch "Docker / stage"
+  docker build -t "$OTA_CE_NS/ota-lith:$OTA_CE_TAG" target/docker/stage
+  ```
+
+- **Recreating `ota-lith` gives it a new container IP, and the nginx proxies cache the old one.**
+  `console`, `reverse-proxy` and `gateway` then answer `502` — including for devices. Restart them
+  after any `up -d` that recreated `ota-lith`:
+
+  ```bash
+  docker restart ota-community-edition-console-1 \
+    ota-community-edition-reverse-proxy-1 ota-community-edition-gateway-1
+  ```

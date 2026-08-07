@@ -116,7 +116,13 @@ render_caddyfile() {
       # signature covers, and MinIO verifies the signature itself (an unsigned request gets a 403),
       # so this must not be rewritten, compressed, or put behind the console login.
       printf '\t@s3 path /%s/*\n' "${TUF_TARGETS_BUCKET:-ota-targets}"
-      printf '\thandle @s3 {\n\t\treverse_proxy minio:9000\n\t}\n'
+      # header_up -Authorization is REQUIRED, not tidying. garage-sign (inside
+      # torizoncore-builder) only withholds its bearer token when the upload host ends in
+      # .amazonaws.com, so on a self-hosted store it sends Authorization: Bearer alongside the
+      # pre-signed query. S3 allows exactly one auth mechanism per request, so MinIO rejects it
+      # with a 400 and the client reports "ETag not found in response headers". The header is
+      # meaningless here anyway -- the pre-signed query is what authorises the PUT.
+      printf '\thandle @s3 {\n\t\treverse_proxy minio:9000 {\n\t\t\theader_up -Authorization\n\t\t}\n\t}\n'
     fi
     if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
       printf '\thandle {\n\t\tencode gzip\n\t\treverse_proxy oauth2-proxy:4180\n\t}\n'
