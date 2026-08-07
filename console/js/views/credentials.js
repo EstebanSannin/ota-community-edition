@@ -18,10 +18,11 @@ async function loadCredential(){
       <span>No credential issued yet.</span>${btn}</div>`;
     return;
   }
+  const issued = c.created_at * 1000;      // the service stores unix *seconds*
   el.innerHTML = `<table><thead><tr><th>Client ID</th><th>Issued</th><th class="right">Actions</th></tr></thead>
     <tbody><tr>
       <td class="mono">${esc(c.client_id)}</td>
-      <td>${esc(relTime(c.created_at))} <span class="muted">(${esc(fmtTime(c.created_at))})</span></td>
+      <td>${esc(relTime(issued))} <span class="muted">(${esc(fmtTime(issued))})</span></td>
       <td class="right">${btn} <button class="btn sm danger" onclick="revokeCredential()">Revoke</button></td>
     </tr></tbody></table>`;
 }
