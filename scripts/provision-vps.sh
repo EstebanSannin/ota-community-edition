@@ -79,33 +79,51 @@ GATEWAY_URL=https://$RAS_PUBLIC_HOST:30443
 PROVISION_REQUIRE_TOKEN=1
 PROVISION_TOKEN_TTL=3600
 EOF
+# Console login via GitHub (optional). Written here so compose can interpolate them; the secret
+# itself comes from the environment of whoever runs this script — it is never echoed.
+if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+  cat >> "$APP_DIR/.env" <<EOF
+GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET=$GITHUB_CLIENT_SECRET
+OAUTH_ALLOWED_USERS=$OAUTH_ALLOWED_USERS
+EOF
+fi
 # Render the Caddyfile with values inlined (incl. the bcrypt hash) — no env-var indirection, so
-# compose's interpolation can't mangle the hash's '$' chars. Only when a hash is provided.
+# compose's interpolation can't mangle the hash's '$' chars.
 # caddy/Caddyfile is gitignored (generated secret); the checked-in template is caddy/Caddyfile.example.
-if [ -n "$CONSOLE_PASSWORD_HASH" ]; then
+#
+# Two login modes. GITHUB_CLIENT_ID set -> per-user GitHub login via oauth2-proxy; otherwise the
+# single shared password (basic_auth). Either way the device-enrollment paths bypass the login
+# entirely — they are gated by a short-lived provisioning token instead, and keeping them in Caddy
+# means enrollment keeps working even if oauth2-proxy is down.
+render_caddyfile() {
   mkdir -p "$APP_DIR/caddy"
-  cat > "$APP_DIR/caddy/Caddyfile" <<EOF
-{
-	email $ACME_EMAIL
+  {
+    printf '{\n\temail %s\n}\n\n' "$ACME_EMAIL"
+    printf '%s {\n\tencode gzip\n' "$RAS_PUBLIC_HOST"
+    printf '\t@provision path /provision-device.sh /install-reporter.sh /api/provision /api/provision/*\n'
+    printf '\thandle @provision {\n\t\treverse_proxy console:80\n\t}\n'
+    if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+      printf '\thandle {\n\t\treverse_proxy oauth2-proxy:4180\n\t}\n'
+    else
+      printf '\thandle {\n\t\tbasic_auth {\n\t\t\t%s %s\n\t\t}\n\t\treverse_proxy console:80\n\t}\n' \
+        "$CONSOLE_USER" "$CONSOLE_PASSWORD_HASH"
+    fi
+    printf '}\n'
+  } > "$APP_DIR/caddy/Caddyfile"
+  chmod 600 "$APP_DIR/caddy/Caddyfile"
 }
 
-$RAS_PUBLIC_HOST {
-	encode gzip
-	# Device enrollment is gated by PROVISION_TOKEN (not the console password), so these paths
-	# bypass basic_auth — a device can enroll with the token without the shared login.
-	@provision path /provision-device.sh /install-reporter.sh /api/provision /api/provision/*
-	handle @provision {
-		reverse_proxy console:80
-	}
-	handle {
-		basic_auth {
-			$CONSOLE_USER $CONSOLE_PASSWORD_HASH
-		}
-		reverse_proxy console:80
-	}
-}
-EOF
-  chmod 600 "$APP_DIR/caddy/Caddyfile"
+if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+  : "${OAUTH_ALLOWED_USERS:?set OAUTH_ALLOWED_USERS to the GitHub logins allowed in — an empty allowlist would let any GitHub account sign in}"
+  # Deployment secret (not a user credential): generate once and keep it, so existing sessions
+  # survive a re-run of this script.
+  if ! grep -q '^OAUTH_COOKIE_SECRET=' "$APP_DIR/.env" 2>/dev/null; then
+    echo "OAUTH_COOKIE_SECRET=$(openssl rand -base64 32)" >> "$APP_DIR/.env"
+  fi
+  render_caddyfile
+elif [ -n "$CONSOLE_PASSWORD_HASH" ]; then
+  render_caddyfile
 fi
 
 say "7/8  certs + bring up the stack"
@@ -117,14 +135,28 @@ if [ -d ota-ce-gen ] && ! openssl x509 -in ota-ce-gen/server.crt -noout -text 2>
   rm -rf ota-ce-gen
 fi
 [ -d ota-ce-gen ] || GATEWAY_ALT_NAMES="$RAS_PUBLIC_HOST" scripts/gen-server-certs.sh
+# NB: plain `[ test ] && arr+=(...)` as a statement is a `set -e` landmine — a false test makes
+# the script exit. Use if-blocks.
 FILES=(-f compose.release.yaml)
-[ -n "$CONSOLE_PASSWORD_HASH" ] && FILES+=(-f compose.public.yaml)
+if [ -n "$CONSOLE_PASSWORD_HASH" ] || [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+  FILES+=(-f compose.public.yaml)
+fi
+if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+  FILES+=(-f compose.oauth2.yaml)
+fi
 # `up` uses the locally-built ras and pulls only the missing images (no blanket pull that would
 # choke on ras). --env-file makes the vars available for substitution.
 docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d
 # compose doesn't detect bind-mount *content* changes (Caddyfile, console nginx.conf/index.html),
 # so force-recreate the proxies to pick up re-rendered/updated config on a re-run.
-RECREATE=(console gateway provisioner); [ -n "$CONSOLE_PASSWORD_HASH" ] && RECREATE+=(caddy)
+RECREATE=(console gateway provisioner)
+# caddy must be recreated in EITHER login mode so it picks up the re-rendered Caddyfile.
+if [ -n "$CONSOLE_PASSWORD_HASH" ] || [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+  RECREATE+=(caddy)
+fi
+if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
+  RECREATE+=(oauth2-proxy)
+fi
 docker compose "${FILES[@]}" --env-file "$APP_DIR/.env" up -d --force-recreate "${RECREATE[@]}"
 echo "   waiting for ota-lith to become healthy…"
 for _ in $(seq 1 100); do
