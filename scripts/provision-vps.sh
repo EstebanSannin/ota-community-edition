@@ -136,6 +136,9 @@ render_caddyfile() {
       # browsers to /login and returns 401 to API callers.
       printf '\t@authpub path /login /logout /auth/*\n'
       printf '\thandle @authpub {\n\t\treverse_proxy auth:9930\n\t}\n'
+      # The System page (observability) is admin-only: gate its data API on an admin session.
+      printf '\t@ops path /api/ops/*\n'
+      printf '\thandle @ops {\n\t\tforward_auth auth:9930 {\n\t\t\turi /auth/verify-admin\n\t\t}\n\t\treverse_proxy console:80\n\t}\n'
       printf '\thandle {\n\t\tforward_auth auth:9930 {\n\t\t\turi /auth/verify\n\t\t\tcopy_headers X-Auth-User\n\t\t}\n\t\tencode gzip\n\t\treverse_proxy console:80\n\t}\n'
     elif [ -n "${GITHUB_CLIENT_ID:-}" ]; then
       printf '\thandle {\n\t\tencode gzip\n\t\treverse_proxy oauth2-proxy:4180\n\t}\n'

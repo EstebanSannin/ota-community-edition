@@ -67,7 +67,13 @@ def db():
     con = sqlite3.connect(os.path.join(DATA_DIR, "auth.db"))
     con.execute("CREATE TABLE IF NOT EXISTS users "
                 "(username TEXT PRIMARY KEY, pw_hash TEXT NOT NULL, salt TEXT NOT NULL, "
-                " created_at INTEGER NOT NULL, disabled INTEGER NOT NULL DEFAULT 0)")
+                " created_at INTEGER NOT NULL, disabled INTEGER NOT NULL DEFAULT 0, "
+                " is_admin INTEGER NOT NULL DEFAULT 0)")
+    # Migrate a pre-role database in place (SQLite has no IF NOT EXISTS for ADD COLUMN).
+    cols = [r[1] for r in con.execute("PRAGMA table_info(users)").fetchall()]
+    if "is_admin" not in cols:
+        con.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+        con.commit()
     return con
 
 
@@ -90,12 +96,16 @@ def verify_hash(password, salt_hex, stored):
     return hmac.compare_digest(calc, h)
 
 
-def set_user(username, password):
+def set_user(username, password, is_admin=None):
+    # is_admin=None preserves the current role (used by a password reset); True/False sets it.
     salt = secrets.token_hex(16)
+    admin_val = None if is_admin is None else (1 if is_admin else 0)
     con = db()
-    con.execute("INSERT OR REPLACE INTO users (username, pw_hash, salt, created_at, disabled) "
-                "VALUES (?,?,?,COALESCE((SELECT created_at FROM users WHERE username=?),?),0)",
-                (username, hash_pw(password, salt), salt, username, int(time.time())))
+    con.execute("INSERT OR REPLACE INTO users (username, pw_hash, salt, created_at, disabled, is_admin) "
+                "VALUES (?,?,?,COALESCE((SELECT created_at FROM users WHERE username=?),?),0,"
+                "COALESCE(?,(SELECT is_admin FROM users WHERE username=?),0))",
+                (username, hash_pw(password, salt), salt, username, int(time.time()),
+                 admin_val, username))
     con.commit()
     con.close()
     purge_sessions(username)                 # any old sessions must not survive a password change
@@ -103,9 +113,9 @@ def set_user(username, password):
 
 def list_users():
     con = db()
-    rows = con.execute("SELECT username, created_at, disabled FROM users ORDER BY username").fetchall()
+    rows = con.execute("SELECT username, created_at, disabled, is_admin FROM users ORDER BY username").fetchall()
     con.close()
-    return [{"username": u, "created_at": c, "disabled": bool(d)} for u, c, d in rows]
+    return [{"username": u, "created_at": c, "disabled": bool(d), "admin": bool(a)} for u, c, d, a in rows]
 
 
 def user_count():
@@ -113,6 +123,20 @@ def user_count():
     n = con.execute("SELECT COUNT(*) FROM users WHERE disabled=0").fetchone()[0]
     con.close()
     return n
+
+
+def admin_count():
+    con = db()
+    n = con.execute("SELECT COUNT(*) FROM users WHERE disabled=0 AND is_admin=1").fetchone()[0]
+    con.close()
+    return n
+
+
+def is_admin(username):
+    con = db()
+    row = con.execute("SELECT is_admin FROM users WHERE username=? AND disabled=0", (username,)).fetchone()
+    con.close()
+    return bool(row and row[0])
 
 
 def delete_user(username):
@@ -133,22 +157,27 @@ def verify_pw(username, password):
 
 
 # ---- sessions ----
-def new_session(username):
+def new_session(username, admin):
     token = secrets.token_urlsafe(32)
     with _lock:
         now = time.time()
         for t in [t for t, s in _sessions.items() if s["exp"] < now]:
             _sessions.pop(t, None)
-        _sessions[token] = {"user": username, "exp": now + SESSION_TTL}
+        _sessions[token] = {"user": username, "admin": bool(admin), "exp": now + SESSION_TTL}
     return token
 
 
-def session_user(token):
+def session_info(token):
     with _lock:
         s = _sessions.get(token or "")
         if s and s["exp"] > time.time():
-            return s["user"]
+            return {"user": s["user"], "admin": s["admin"]}
         return None
+
+
+def session_user(token):
+    s = session_info(token)
+    return s["user"] if s else None
 
 
 def drop_session(token):
@@ -183,18 +212,31 @@ def clear_fails(username):
 
 # ---- bootstrap: never leave the instance with no way in ----
 def ensure_admin():
-    if user_count() > 0:
+    # No users at all: create the first administrator.
+    if user_count() == 0:
+        user = os.environ.get("AUTH_ADMIN_USER", "admin")
+        pw = os.environ.get("AUTH_ADMIN_PASSWORD") or secrets.token_urlsafe(12)
+        set_user(user, pw, is_admin=True)
+        if os.environ.get("AUTH_ADMIN_PASSWORD"):
+            print(f"auth: created initial administrator '{user}' from AUTH_ADMIN_PASSWORD", flush=True)
+        else:
+            print("auth: no users existed - created an initial administrator:", flush=True)
+            print(f"auth:     username: {user}", flush=True)
+            print(f"auth:     password: {pw}", flush=True)
+            print("auth: log in and change it from the Users page; this is shown only once.", flush=True)
         return
-    user = os.environ.get("AUTH_ADMIN_USER", "admin")
-    pw = os.environ.get("AUTH_ADMIN_PASSWORD") or secrets.token_urlsafe(12)
-    set_user(user, pw)
-    if os.environ.get("AUTH_ADMIN_PASSWORD"):
-        print(f"auth: created initial user '{user}' from AUTH_ADMIN_PASSWORD", flush=True)
-    else:
-        print("auth: no users existed - created an initial administrator:", flush=True)
-        print(f"auth:     username: {user}", flush=True)
-        print(f"auth:     password: {pw}", flush=True)
-        print("auth: log in and change it from the Users page; this is shown only once.", flush=True)
+    # Users exist but none is an admin (e.g. a database migrated from before roles): promote one, so
+    # the instance is never left with no way to reach the admin-only pages.
+    if admin_count() == 0:
+        con = db()
+        want = os.environ.get("AUTH_ADMIN_USER", "admin")
+        row = con.execute("SELECT username FROM users WHERE username=?", (want,)).fetchone()
+        target = row[0] if row else con.execute(
+            "SELECT username FROM users ORDER BY created_at LIMIT 1").fetchone()[0]
+        con.execute("UPDATE users SET is_admin=1 WHERE username=?", (target,))
+        con.commit()
+        con.close()
+        print(f"auth: no administrator existed - promoted '{target}' to admin", flush=True)
 
 
 LOGIN_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -278,20 +320,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return None
         return user
 
+    def _require_admin(self):
+        s = session_info(self._cookie())
+        if not s:
+            self._send(401, json.dumps({"error": "not authenticated"}))
+            return None
+        if not s["admin"]:
+            self._send(403, json.dumps({"error": "administrator access required"}))
+            return None
+        return s["user"]
+
     # ---- routing ----
     def do_GET(self):
         path = self.path.split("?")[0]
         if path == "/auth/verify":
-            return self._verify()
+            return self._verify(admin=False)
+        if path == "/auth/verify-admin":
+            return self._verify(admin=True)
         if path == "/login":
             return self._login_form()
         if path == "/auth/api/me":
-            user = self._require_session()
-            if user:
-                self._send(200, json.dumps({"username": user}))
-            return
+            s = session_info(self._cookie())
+            if not s:
+                return self._send(401, json.dumps({"error": "not authenticated"}))
+            return self._send(200, json.dumps({"username": s["user"], "admin": s["admin"]}))
         if path == "/auth/api/users":
-            if self._require_session():
+            if self._require_admin():
                 self._send(200, json.dumps({"values": list_users()}))
             return
         if path in ("/auth/health", "/health"):
@@ -319,9 +373,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(404, json.dumps({"error": "not found"}))
 
     # ---- forward_auth ----
-    def _verify(self):
-        if session_user(self._cookie()):
+    def _verify(self, admin=False):
+        s = session_info(self._cookie())
+        if s and (s["admin"] or not admin):
             return self._send(200, "")
+        # An authenticated non-admin hitting an admin-only path: deny, don't bounce to login.
+        if s and admin:
+            return self._send(403, json.dumps({"error": "administrator access required"}))
         # Caddy passes the original request via X-Forwarded-*. Bounce browsers to the login page
         # (carrying where they wanted to go); answer XHR/API callers with a plain 401.
         orig = self.headers.get("X-Forwarded-Uri", "/")
@@ -349,50 +407,51 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._login_form("Too many attempts. Wait a minute and try again.")
         if username and password and verify_pw(username, password):
             clear_fails(username)
-            token = new_session(username)
-            print(f"auth: login ok for '{username}'", flush=True)
+            token = new_session(username, is_admin(username))
+            print(f"auth: login ok for '{username}'{' (admin)' if is_admin(username) else ''}", flush=True)
             return self._redirect(nxt, [self._set_cookie(token)])
         record_fail(username)
         print(f"auth: login failed for '{username or '(blank)'}'", flush=True)
         self._login_form("Wrong username or password.")
 
-    # ---- user admin (all require a session) ----
+    # ---- user admin (all require an ADMIN session) ----
     def _create_user(self):
-        if not self._require_session():
+        if not self._require_admin():
             return
         body = self._json()
         username = (body.get("username") or "").strip()
         password = body.get("password") or ""
+        admin = bool(body.get("admin"))
         if not SAFE_USER.match(username):
             return self._send(400, json.dumps({"error": "username: letters, digits, . _ - (max 64)"}))
         if len(password) < 8:
             return self._send(400, json.dumps({"error": "password must be at least 8 characters"}))
         exists = any(u["username"] == username for u in list_users())
-        set_user(username, password)
-        print(f"auth: {'updated' if exists else 'created'} user '{username}'", flush=True)
-        self._send(200, json.dumps({"username": username, "created": not exists}))
+        set_user(username, password, is_admin=admin)
+        print(f"auth: {'updated' if exists else 'created'} user '{username}'{' (admin)' if admin else ''}", flush=True)
+        self._send(200, json.dumps({"username": username, "created": not exists, "admin": admin}))
 
     def _reset_password(self, username):
-        if not self._require_session():
+        if not self._require_admin():
             return
         password = self._json().get("password") or ""
         if not any(u["username"] == username for u in list_users()):
             return self._send(404, json.dumps({"error": "no such user"}))
         if len(password) < 8:
             return self._send(400, json.dumps({"error": "password must be at least 8 characters"}))
-        set_user(username, password)                 # also purges that user's sessions
+        set_user(username, password)                 # role preserved; also purges that user's sessions
         print(f"auth: reset password for '{username}'", flush=True)
         self._send(200, json.dumps({"ok": True}))
 
     def _delete_user(self, username):
-        me = self._require_session()
-        if not me:
+        if not self._require_admin():
             return
-        if not any(u["username"] == username for u in list_users()):
+        row = next((u for u in list_users() if u["username"] == username), None)
+        if not row:
             return self._send(404, json.dumps({"error": "no such user"}))
-        # Never let the console lock everyone out.
-        if user_count() <= 1:
-            return self._send(400, json.dumps({"error": "cannot delete the last user"}))
+        # Never let the console lose its last administrator (which would lock out the admin pages).
+        if row["admin"] and admin_count() <= 1:
+            return self._send(400, json.dumps({"error": "cannot delete the last administrator"}))
         delete_user(username)
         print(f"auth: deleted user '{username}'", flush=True)
         self._send(200, json.dumps({"ok": True}))
