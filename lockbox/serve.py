@@ -291,7 +291,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, json.dumps({"issued": c}))
 
         if path.startswith("/tuf/"):
-            return proxy_to_reposerver(self, path, "GET")
+            return proxy_to_reposerver(self, self.path, "GET")     # keep the query string
 
         m = re.match(r"^/api/lockbox/(.+)\.zip$", path)
         if m:
@@ -342,7 +342,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                                "token_type": "Bearer", "expires_in": TOKEN_TTL}))
 
         if path.startswith("/tuf/"):
-            return proxy_to_reposerver(self, path, "POST")
+            return proxy_to_reposerver(self, self.path, "POST")   # keep the query string
         self._send(404, json.dumps({"error": "not found"}))
 
     def do_PUT(self):
@@ -360,7 +360,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             print("lockbox: tooling credential revoked", flush=True)
             return self._send(204, b"")
         if path.startswith("/tuf/"):
-            return proxy_to_reposerver(self, path, "DELETE")
+            return proxy_to_reposerver(self, self.path, "DELETE")  # keep the query string
         self._send(404, json.dumps({"error": "not found"}))
 
 
