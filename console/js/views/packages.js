@@ -1,5 +1,5 @@
 // Packages: list, sources, upload, detail, and deploy.
-import { api, bytes, esc, fmtTime, rapi, relTime } from '../lib/api.js';
+import { api, asciiSafe, bytes, esc, fmtTime, rapi, relTime } from '../lib/api.js';
 import { uiConfirm, uiPick, uiPrompt } from '../lib/dialogs.js';
 import { expose, showMsg, toast } from '../lib/ui.js';
 import { go } from '../router.js';
@@ -214,7 +214,9 @@ async function doUpload(){const name=document.getElementById('upName').value.tri
   const target=`${name}-${ver}`,q=`name=${encodeURIComponent(name)}&version=${encodeURIComponent(ver)}&hardwareIds=${encodeURIComponent(hw)}`;const fd=new FormData();fd.append('file',file);
   btn.disabled=true;showMsg(msg,'ok','Uploading '+file.name+'…');
   try{await api(rapi(`targets/${encodeURIComponent(target)}?${q}`),{method:'PUT',body:fd});
-    if(desc){try{await api(rapi('proprietary-custom/'+encodeURIComponent(target)),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc})});}catch(e){}}
+    const descA=asciiSafe(desc);
+    if(descA!==desc)toast('Description simplified to ASCII — non-ASCII characters break device metadata verification');
+    if(descA){try{await api(rapi('proprietary-custom/'+encodeURIComponent(target)),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:descA})});}catch(e){}}
     await loadTargets();closeUpload();PKGSRC='mine';renderPackages();toast('✓ Uploaded '+target);}catch(e){showMsg(msg,'err','Upload failed: '+e.message);btn.disabled=false;}}
 
 // ---------- package detail ----------
@@ -273,8 +275,10 @@ async function deletePackage(){const p=PKGCUR;if(!p||p.source!=='mine')return;
   try{await api(rapi('targets/'+encodeURIComponent(p.key)),{method:'DELETE'});await loadTargets();toast('Package deleted');go('packages');}catch(e){toast('Delete failed: '+e.message);}}
 async function editPkgDescription(){const p=PKGCUR;if(!p||p.source!=='mine')return;
   const v=await uiPrompt({title:'Edit description',label:'Description',value:p.description||'',multiline:true,ok:'Save'});if(v==null)return;
-  try{await api(rapi('proprietary-custom/'+encodeURIComponent(p.key)),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:v.trim()})});
-    p.description=v.trim();await loadTargets();renderPkgDetail(null);toast('Description saved');}catch(e){toast('Save failed: '+e.message);}}
+  const vA=asciiSafe(v.trim());
+  if(vA!==v.trim())toast('Description simplified to ASCII — non-ASCII characters break device metadata verification');
+  try{await api(rapi('proprietary-custom/'+encodeURIComponent(p.key)),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:vA})});
+    p.description=vA;await loadTargets();renderPkgDetail(null);toast('Description saved');}catch(e){toast('Save failed: '+e.message);}}
 
 export { deployPrompt, loadSources, loadTargets, renderPackages };
 

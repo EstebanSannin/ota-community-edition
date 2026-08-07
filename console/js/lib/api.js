@@ -9,6 +9,14 @@ const relTime=t=>{if(!t)return'—';let s=(Date.now()-new Date(t))/1000;const fu
   let v;if(s<3600)v=Math.floor(s/60)+' min';else if(s<86400)v=Math.floor(s/3600)+' h';else v=Math.floor(s/86400)+' d';
   return fut?('in '+v):(v+' ago');};
 const shortHash=h=>h?h.slice(0,12):'';
+// Package metadata must stay ASCII. A multi-byte character anywhere in targets.json makes the
+// device reject the whole image-repo metadata ("Snapshot hash mismatch for targets metadata") and
+// every update then fails — one em dash in a description was enough. Fold the usual typographic
+// characters to their ASCII equivalents and drop anything else outside ASCII.
+const asciiSafe=s=>String(s==null?'':s)
+  .replace(/[‐-―]/g,'-').replace(/[‘’‛]/g,"'")
+  .replace(/[“”‟]/g,'"').replace(/…/g,'...')
+  .replace(/[   ]/g,' ').replace(/[^\x20-\x7E\n\r\t]/g,'');
 const bytes=n=>{n=+n;if(!n||n<0)return null;const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (n>=100?Math.round(n):n.toFixed(1))+' '+u[i];};
 
-export { api, bytes, dapi, esc, fmtTime, rapi, relTime, shortHash };
+export { api, asciiSafe, bytes, dapi, esc, fmtTime, rapi, relTime, shortHash };
