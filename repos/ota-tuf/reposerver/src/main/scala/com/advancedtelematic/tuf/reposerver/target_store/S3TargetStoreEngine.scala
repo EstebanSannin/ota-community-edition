@@ -7,6 +7,7 @@ import java.util.Date
 
 import scala.async.Async._
 import scala.jdk.CollectionConverters._
+import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.apache.pekko.http.scaladsl.util.FastFuture
@@ -22,14 +23,16 @@ import com.advancedtelematic.libtuf.data.TufDataType.{
 }
 import com.advancedtelematic.tuf.reposerver.Settings
 import com.advancedtelematic.tuf.reposerver.target_store.TargetStoreEngine.{
+  TargetBytes,
   TargetRedirect,
   TargetRetrieveResult,
   TargetStoreResult
 }
 import com.amazonaws.HttpMethod
 import com.amazonaws.auth.{AWSCredentials, AWSCredentialsProvider}
+import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.regions.Regions
-import com.amazonaws.services.s3.{AmazonS3ClientBuilder, Headers}
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder, Headers}
 import com.amazonaws.services.s3.model.{
   CannedAccessControlList,
   CompleteMultipartUploadRequest,
@@ -55,12 +58,35 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
 
   private val log = LoggerFactory.getLogger(this.getClass)
 
-  private lazy val s3client = AmazonS3ClientBuilder
-    .standard()
-    .withCredentials(credentials)
-    .withRegion(credentials.region)
-    .withDualstackEnabled(true)
-    .build()
+  private def s3ClientFor(endpoint: Option[String]): AmazonS3 = {
+    val builder = AmazonS3ClientBuilder.standard().withCredentials(credentials)
+
+    endpoint
+      .map { url =>
+        // S3-compatible store (MinIO and friends): talk to a fixed endpoint and keep the bucket
+        // in the path - a virtual-host style `bucket.host` name would not resolve. Dualstack is
+        // AWS-only and the SDK rejects it together with an explicit endpoint.
+        builder
+          .withEndpointConfiguration(new EndpointConfiguration(url, credentials.region.getName))
+          .withPathStyleAccessEnabled(true)
+      }
+      .getOrElse(builder.withRegion(credentials.region).withDualstackEnabled(true))
+      .build()
+  }
+
+  private lazy val s3client = s3ClientFor(credentials.endpointUrl)
+
+  // Pre-signed URLs are handed out to clients that live outside our network, so they must be
+  // signed for a host those clients can actually reach (the signature covers the Host header).
+  // Everything else - putObject, getObject, initiate/complete multipart - is a server-side call
+  // and goes to the internal endpoint.
+  private lazy val signingClient =
+    if (credentials.publicEndpointUrl.isEmpty)
+      s3client
+    else if (credentials.publicEndpointUrl == credentials.endpointUrl)
+      s3client
+    else
+      s3ClientFor(credentials.publicEndpointUrl)
 
   override def store(repoId: RepoId,
                      filename: TargetFilename,
@@ -128,16 +154,37 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
     }
   }
 
-  override def retrieve(repoId: RepoId, filename: TargetFilename): Future[TargetRetrieveResult] = {
-    val storagePath = storageFilename(repoId, filename)
-    val publicExpireTime = Duration.ofDays(1)
-    val expire = java.util.Date.from(Instant.now.plus(publicExpireTime))
-    Future {
-      val signedUri = blocking {
-        s3client.generatePresignedUrl(bucketId, storagePath.toString, expire)
-      }
+  override def retrieve(repoId: RepoId, filename: TargetFilename): Future[TargetRetrieveResult] =
+    if (credentials.endpointUrl.isDefined) retrieveBytes(repoId, filename)
+    else {
+      val storagePath = storageFilename(repoId, filename)
+      val publicExpireTime = Duration.ofDays(1)
+      val expire = java.util.Date.from(Instant.now.plus(publicExpireTime))
+      Future {
+        val signedUri = blocking {
+          signingClient.generatePresignedUrl(bucketId, storagePath.toString, expire)
+        }
 
-      TargetRedirect(Uri(signedUri.toURI.toString))
+        TargetRedirect(Uri(signedUri.toURI.toString))
+      }
+    }
+
+  // Self-hosted object store: stream the bytes back through the reposerver rather than
+  // redirecting the caller to the store. Devices then only ever talk to the OTA gateway - they
+  // don't have to reach the object store or trust its TLS certificate, so switching storage
+  // backends leaves the device-facing download path untouched.
+  private def retrieveBytes(repoId: RepoId,
+                            filename: TargetFilename): Future[TargetRetrieveResult] = {
+    val storagePath = storageFilename(repoId, filename).toString
+
+    Future {
+      val obj = blocking(s3client.getObject(bucketId, storagePath))
+      val size = obj.getObjectMetadata.getContentLength
+      val bytes = StreamConverters
+        .fromInputStream(() => obj.getObjectContent)
+        .mapMaterializedValue(_ => FastFuture.successful(Done))
+
+      TargetBytes(bytes, size)
     }
   }
 
@@ -160,7 +207,7 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
       val req = new GeneratePresignedUrlRequest(bucketId, objectId, HttpMethod.PUT)
       req.putCustomRequestHeader("Content-Length", length.toString)
       req.setExpiration(expiresAt)
-      val url = s3client.generatePresignedUrl(req)
+      val url = signingClient.generatePresignedUrl(req)
       log.debug(s"Signed s3 url for $objectId")
       url.toString
     }
@@ -189,7 +236,7 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
     req.addRequestParameter("partNumber", partNumber)
     req.setContentMd5(md5)
     req.putCustomRequestHeader(Headers.CONTENT_LENGTH, contentLength.toString)
-    Try(s3client.generatePresignedUrl(req)).map(GetSignedUrlResult.apply)
+    Try(signingClient.generatePresignedUrl(req)).map(GetSignedUrlResult.apply)
   }
 
   override def completeMultipartUpload(repoId: RepoId,
@@ -205,7 +252,17 @@ class S3TargetStoreEngine(credentials: S3Credentials)(implicit val system: Actor
 
 }
 
-class S3Credentials(accessKey: String, secretKey: String, val bucketId: String, val region: Regions)
+/**
+ * `endpointUrl` points the client at an S3-compatible store instead of AWS (e.g. a self-hosted
+ * MinIO); `publicEndpointUrl` is the address that same store is reachable at from outside, used
+ * only when signing upload URLs. Both empty = plain AWS S3, exactly as before.
+ */
+class S3Credentials(accessKey: String,
+                    secretKey: String,
+                    val bucketId: String,
+                    val region: Regions,
+                    val endpointUrl: Option[String] = None,
+                    val publicEndpointUrl: Option[String] = None)
     extends AWSCredentials
     with AWSCredentialsProvider {
   override def getAWSAccessKeyId: String = accessKey

@@ -110,6 +110,14 @@ render_caddyfile() {
     # until the gateway stopped gzipping (see ota-ce/gateway.conf).
     printf '\t@tuf path /tuf /tuf/*\n'
     printf '\thandle @tuf {\n\t\treverse_proxy lockbox:9920\n\t}\n'
+    if [ -n "${MINIO_ROOT_PASSWORD:-}" ]; then
+      # Pre-signed S3 URLs address the bucket by path, so they arrive here as
+      # /<bucket>/<key>?X-Amz-... Pass them to MinIO byte-for-byte: the path is part of what the
+      # signature covers, and MinIO verifies the signature itself (an unsigned request gets a 403),
+      # so this must not be rewritten, compressed, or put behind the console login.
+      printf '\t@s3 path /%s/*\n' "${TUF_TARGETS_BUCKET:-ota-targets}"
+      printf '\thandle @s3 {\n\t\treverse_proxy minio:9000\n\t}\n'
+    fi
     if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
       printf '\thandle {\n\t\tencode gzip\n\t\treverse_proxy oauth2-proxy:4180\n\t}\n'
     else
@@ -152,6 +160,12 @@ if [ -n "$CONSOLE_PASSWORD_HASH" ] || [ -n "${GITHUB_CLIENT_ID:-}" ]; then
 fi
 if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
   FILES+=(-f compose.oauth2.yaml)
+fi
+# Opt-in: set MINIO_ROOT_PASSWORD in .env to keep targets in MinIO instead of on local disk.
+# Needed for out-of-band uploads (torizoncore-builder `platform push`). On an instance that
+# already has targets on disk, migrate them once — see the header of compose.s3.yaml.
+if [ -n "${MINIO_ROOT_PASSWORD:-}" ]; then
+  FILES+=(-f compose.s3.yaml)
 fi
 # `up` uses the locally-built ras and pulls only the missing images (no blanket pull that would
 # choke on ras). --env-file makes the vars available for substitution.

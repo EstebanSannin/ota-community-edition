@@ -48,8 +48,18 @@ trait Settings {
     val secretKey = _config.getString("storage.s3.secretKey")
     val bucketId = _config.getString("storage.s3.bucketId")
     val region = Regions.fromName(_config.getString("storage.s3.region"))
-    new S3Credentials(accessKey, secretKey, bucketId, region)
+    new S3Credentials(
+      accessKey,
+      secretKey,
+      bucketId,
+      region,
+      optionalString("storage.s3.endpointUrl"),
+      optionalString("storage.s3.publicEndpointUrl")
+    )
   }
+
+  private def optionalString(path: String): Option[String] =
+    if (_config.hasPath(path)) Option(_config.getString(path)).filter(_.nonEmpty) else None
 
   lazy val azureSettings = {
     val azureConfig = _config.getConfig("storage.azure")

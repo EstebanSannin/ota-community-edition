@@ -1,0 +1,82 @@
+# Optional S3 storage overlay — stores TUF *targets* in a bundled MinIO instead of on local disk.
+# Layer it ON TOP of the release (+ public) compose:
+#
+#   docker compose -f compose.release.yaml -f compose.public.yaml -f compose.s3.yaml \
+#     --env-file .env up -d
+#
+# WHY YOU WANT THIS: `torizoncore-builder platform push` uploads a target *out of band* — it asks
+# the server for a pre-signed URL and PUTs the bytes straight to the object store. The reposerver's
+# local-disk backend refuses every out-of-band operation ("out of band storage of target is not
+# supported for local storage"), so pushing from external tooling only works with S3 storage.
+# Uploading through the console works either way.
+#
+# Requires (in your .env):
+#   MINIO_ROOT_PASSWORD=...                # >= 8 chars; `openssl rand -hex 16` is fine
+#   S3_PUBLIC_ENDPOINT=https://ota.example.com   # defaults to https://$RAS_PUBLIC_HOST
+#
+# S3_PUBLIC_ENDPOINT is the address MinIO is reachable at *from outside*, and it must be the exact
+# host the upload URL is signed for (the signature covers the Host header). On the public VPS that
+# is the Caddy front, which routes the bucket path through to MinIO — see caddy/Caddyfile.example.
+#
+# SWITCHING STORAGE DOES NOT MOVE EXISTING TARGETS. Both backends use the same key layout, so
+# migrate them once with (adjust the volume name to your compose project):
+#
+#   docker run --rm --network ota-community-edition_default \
+#     -v ota-community-edition_objects:/o -e MC_HOST_local=http://<user>:<pass>@minio:9000 \
+#     minio/mc mirror /o/tuf-objects local/ota-targets
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  minio:
+    image: minio/minio:latest
+    restart: always
+    logging: *default-logging
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-otaadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in your .env}
+      # Must match the region the reposerver signs with, or SigV4 verification fails.
+      MINIO_SITE_REGION: us-east-1
+    volumes:
+      - minio-data:/data
+    expose:
+      - "9000"             # internal only — never published to the host. Reached by ota-lith
+                           # directly, and from outside only via the front proxy's bucket route.
+
+  # One-shot: create the bucket, then exit. Retries until MinIO is listening, so it needs no
+  # healthcheck. Safe to re-run — `mc mb --ignore-existing` is idempotent.
+  minio-init:
+    image: minio/mc:latest
+    restart: "no"
+    logging: *default-logging
+    depends_on:
+      - minio
+    environment:
+      MC_HOST_ota: http://${MINIO_ROOT_USER:-otaadmin}:${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in your .env}@minio:9000
+      BUCKET: ${TUF_TARGETS_BUCKET:-ota-targets}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        until mc ls ota >/dev/null 2>&1; do echo "waiting for minio…"; sleep 1; done
+        mc mb --ignore-existing "ota/$$BUCKET"
+        echo "bucket $$BUCKET ready"
+
+  ota-lith:
+    environment:
+      STORAGE_TYPE: s3
+      TUF_REPOSERVER_AWS_ACCESS_KEY: ${MINIO_ROOT_USER:-otaadmin}
+      TUF_REPOSERVER_AWS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in your .env}
+      TUF_REPOSERVER_AWS_BUCKET_ID: ${TUF_TARGETS_BUCKET:-ota-targets}
+      TUF_REPOSERVER_AWS_REGION: us-east-1
+      # Server-side calls go straight to the container; only upload URLs are signed for the
+      # public address. With an endpoint set, target *downloads* are streamed through the
+      # reposerver, so devices keep talking only to the OTA gateway.
+      TUF_REPOSERVER_AWS_ENDPOINT_URL: http://minio:9000
+      TUF_REPOSERVER_AWS_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT:-https://${RAS_PUBLIC_HOST}}
+
+volumes:
+  minio-data:
