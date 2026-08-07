@@ -70,6 +70,7 @@ docker build -t $OTA_CE_NS/ras:latest remote-access/ras
 docker compose -f compose.release.yaml -f compose.public.yaml up -d   # add Caddy TLS+password front
 ```
 Visit `https://ota.example.com` → browser asks for the shared password → the console.
+(For per-user GitHub sign-in instead of one shared password, see [console-auth.md](console-auth.md).)
 
 ## 7. Provision a device (per device)
 Open the console → **Provision device**: it generates a **short-lived enrollment token** and shows a
@@ -98,8 +99,9 @@ sudo systemctl restart rac aktualizr-torizon
 - Consider limiting SSH (22) to your own IP.
 
 ## Later (the roadmap, not today)
-- **Real login**: swap Caddy's `basic_auth` for **oauth2-proxy** (GitHub/Google) via `forward_auth` —
-  same `reverse_proxy console:80` target. Gives per-user login without a shared password.
+- **Real login**: ~~swap Caddy's `basic_auth` for oauth2-proxy~~ — **done**, see
+  [console-auth.md](console-auth.md). Per-user GitHub sign-in with an allowlist, replacing the
+  shared password. The password path below still works for LAN/private deployments.
 - **Multi-tenant** (company account, per-user device lists, shared sub-accounts): a backend change —
   the device-registry/namespaces would key on an authenticated user/org, and the console would scope
   lists per identity. Bigger effort; the single-tenant setup here is the stepping stone.
