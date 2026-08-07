@@ -50,6 +50,25 @@ tls_cacert_path = "/var/sota/import/root.crt"
 EOF
 
 rm -f /var/sota/sql.db
+# Secondaries keep their OWN TUF store, and it is NOT covered by /var/sota/sql.db. A board that
+# was previously registered elsewhere (e.g. Torizon Cloud) keeps that instance's root chain — at a
+# higher version and with different keys — so it rejects this server's metadata with
+# "A key has an incorrect associated key ID" and every app update fails. Drop the stored metadata
+# (keeping each Secondary's keys/serial) so they re-learn the root from this server.
+for secdb in /var/sota/storage/*/sql.db; do
+  [ -f "$secdb" ] || continue
+  python3 - "$secdb" <<'PY' || echo "WARN: could not reset $(dirname "$secdb")"
+import sqlite3, sys
+db = sys.argv[1]
+con = sqlite3.connect(db)
+if con.execute("select count(*) from sqlite_master where type='table' and name='meta'").fetchone()[0]:
+    n = con.execute("select count(*) from meta").fetchone()[0]
+    con.execute("delete from meta")
+    con.commit()
+    print(f"== Reset stale TUF metadata in {db} ({n} row(s))")
+PY
+done
+
 echo "== Starting aktualizr ..."
 systemctl restart aktualizr
 
