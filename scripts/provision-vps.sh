@@ -119,7 +119,9 @@ if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
   # Deployment secret (not a user credential): generate once and keep it, so existing sessions
   # survive a re-run of this script.
   if ! grep -q '^OAUTH_COOKIE_SECRET=' "$APP_DIR/.env" 2>/dev/null; then
-    echo "OAUTH_COOKIE_SECRET=$(openssl rand -base64 32)" >> "$APP_DIR/.env"
+    # 32 hex chars = exactly the 32 bytes oauth2-proxy wants. `openssl rand -base64 32`
+    # gives 44 chars and is REJECTED ("must be 16, 24, or 32 bytes").
+    echo "OAUTH_COOKIE_SECRET=$(openssl rand -hex 16)" >> "$APP_DIR/.env"
   fi
   render_caddyfile
 elif [ -n "$CONSOLE_PASSWORD_HASH" ]; then

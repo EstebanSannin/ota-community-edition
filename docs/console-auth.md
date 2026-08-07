@@ -58,11 +58,13 @@ EOF
 empty allowlist would let any GitHub account on the internet sign in. Adding a friend later is just
 appending their login and restarting oauth2-proxy.
 
-Generate the cookie-signing secret (a deployment secret, not your credential):
+Generate the cookie-signing secret (a deployment secret, not your credential). Use `-hex 16`:
+it gives exactly the 32 bytes oauth2-proxy requires, whereas `openssl rand -base64 32` produces 44
+characters and is rejected.
 
 ```bash
 grep -q '^OAUTH_COOKIE_SECRET=' /opt/ota-community-edition/.env || \
-  echo "OAUTH_COOKIE_SECRET=$(openssl rand -base64 32)" | sudo tee -a /opt/ota-community-edition/.env >/dev/null
+  echo "OAUTH_COOKIE_SECRET=$(openssl rand -hex 16)" | sudo tee -a /opt/ota-community-edition/.env >/dev/null
 ```
 
 ## 3. Switch the front over
