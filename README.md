@@ -106,6 +106,23 @@ The `*.ota.ce` hostnames are only needed for manual admin scripts (`get-credenti
   [docs/api-updates.md](docs/api-updates.md) and [docs/updates-ota-cli.md](docs/updates-ota-cli.md).
 - End-to-end test helpers (aktualizr build, provision/update/source scripts): see [test/](test/README.md).
 
+## Documentation
+
+| Doc | What it covers |
+|---|---|
+| [architecture.md](docs/architecture.md) | how the pieces fit and **why** they were chosen; sharp edges in TUF/Uptane |
+| [roadmap.md](docs/roadmap.md) | what is not done yet, and why it matters |
+| [operations.md](docs/operations.md) | running a deployment: logs, resources, System page, S3 storage |
+| [vps-deploy.md](docs/vps-deploy.md) | standing up a public instance (DNS, TLS, firewall) |
+| [console-auth.md](docs/console-auth.md) | per-user GitHub sign-in for the console |
+| [tooling-credentials.md](docs/tooling-credentials.md) | `credentials.zip` + using `torizoncore-builder` with your instance |
+| [remote-access-design.md](docs/remote-access-design.md) | reverse-SSH remote access and the browser terminal |
+| [torizon-api-compat.md](docs/torizon-api-compat.md) | how far the API matches Torizon Cloud's |
+| [status-report.md](docs/status-report.md) | historical record of the greenfield bring-up |
+
+`CLAUDE.md` at the repo root is a short orientation + hard-won-rules file for AI coding assistants;
+it is worth a read for humans too, since the rules came from real outages.
+
 ## Dependency management
 
 The Uptane services are vendored under `repos/` using
