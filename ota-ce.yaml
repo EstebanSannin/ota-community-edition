@@ -98,6 +98,16 @@ services:
 
   # Device provisioning service — serves provision-device.sh and mints+registers device
   # credentials on demand (the self-hosted equivalent of Torizon Cloud's accounts API).
+  # Packs offline updates ("Lockboxes") into a .zip the console offers for download — no
+  # torizoncore-builder needed. Internal only; reached via the console at /api/lockbox/.
+  lockbox:
+    build: ./lockbox
+    restart: always
+    depends_on:
+      - ota-lith
+    expose:
+      - "9920"
+
   provisioner:
     build: ./provisioner
     restart: always

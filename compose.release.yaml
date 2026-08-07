@@ -133,6 +133,18 @@ services:
 
   # Remote access server (RAC-compatible reverse-SSH). Optional — see remote-access/README.md.
   # Set RAS_PUBLIC_HOST to the public hostname devices + operators reach (your dyndns/VPS name).
+  # Packs offline updates ("Lockboxes") into a .zip the console can offer for download, so no
+  # external tooling (torizoncore-builder) is needed. Internal only — reached via /api/lockbox/.
+  lockbox:
+    image: ${OTA_CE_NS}/ota-ce-lockbox:${OTA_CE_TAG}
+    build: ./lockbox
+    restart: always
+    logging: *default-logging
+    depends_on:
+      - ota-lith
+    expose:
+      - "9920"
+
   # The HTTP API (9080) stays internal; the gateway (/ras/) and console (/api/ras/) proxy to it.
   # Publish the bastion control port (2222) + the reverse-tunnel range (22000-22003) — on a
   # home server these must be forwarded through your router; on a VPS just open them.

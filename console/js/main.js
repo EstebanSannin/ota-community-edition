@@ -6,6 +6,7 @@ import { loadRaSessions } from './views/remote.js';
 import { loadSystem } from './views/system.js';
 import { closeProvision } from './views/provision.js';
 import './views/device.js';
+import './views/lockbox.js';
 import './router.js';
 
 async function refreshAll(){try{await Promise.all([loadDevices(),loadTargets(),loadSources()]);setStatus(true);}catch(e){setStatus(false);}}
