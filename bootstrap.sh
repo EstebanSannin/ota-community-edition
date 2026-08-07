@@ -16,6 +16,11 @@ else
   COMPOSE=(docker compose -f ota-ce.yaml)
   RELEASE=
 fi
+# The System page (service status, resources, live logs) is on by default so a local install "just
+# works". It adds a read-only docker-socket-proxy + a small ops sidecar. Set OBSERVABILITY=0 to skip.
+if [ "${OBSERVABILITY:-1}" != "0" ]; then
+  COMPOSE+=(-f compose.observability.yaml)
+fi
 
 say(){ printf '\n\033[1;36m== %s\033[0m\n' "$*"; }
 
@@ -76,8 +81,11 @@ cat <<EOF
   ✔ OTA Community Edition is up.
 
     Console      http://localhost:8080
+    System page  http://localhost:8080  → "System"  (service status, resources, live logs)
     Provision    open the console → "Provision device"  (one-liner, runs on the device)
     Stop         ${COMPOSE[*]} down       (add -v to also wipe the database)
+
+  Add a login (per-user, offline): see docs/console-auth.md (AUTH_MODE=local).
 
   See docs/status-report.md for what works and how the pieces fit together.
 EOF

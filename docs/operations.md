@@ -158,11 +158,14 @@ Copy those tarballs off the box (e.g. `scp` to your laptop) and keep them safe.
 ## 8. The System page (in-console observability)
 
 The console has a **System** section (left nav) showing service status, CPU/memory/disk,
-and **live logs** per service — no SSH needed. It's powered by an optional overlay
-(`compose.observability.yaml`): a read-only `docker-socket-proxy` (GET-only) plus a small
-`ops` sidecar. The `ops` service never touches the raw Docker socket.
+and **live logs** per service — no SSH needed. It's powered by `compose.observability.yaml`: a
+read-only `docker-socket-proxy` (GET-only) plus a small `ops` sidecar. The `ops` service never
+touches the raw Docker socket.
 
-Enable it by adding the third compose file to your deploy:
+**`bootstrap.sh` includes this by default**, so a fresh local install has a working System page out
+of the box — set `OBSERVABILITY=0` to skip it. When local-users auth is in front, the System page is
+**admin-only** (its `/api/ops` data is gated on an admin session). For an existing deployment you
+manage by hand, add the overlay to your deploy:
 
 ```bash
 cd /opt/ota-community-edition
