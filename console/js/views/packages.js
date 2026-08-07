@@ -1,10 +1,10 @@
 // Packages: list, sources, upload, detail, and deploy.
-import { api, bytes, esc, fmtTime, rapi } from '../lib/api.js';
-import { uiConfirm, uiPick } from '../lib/dialogs.js';
-import { expose, toast } from '../lib/ui.js';
+import { api, bytes, esc, fmtTime, rapi, relTime } from '../lib/api.js';
+import { uiConfirm, uiPick, uiPrompt } from '../lib/dialogs.js';
+import { expose, showMsg, toast } from '../lib/ui.js';
 import { go } from '../router.js';
-import { DEVICES, INSTALLED } from '../state.js';
-import { H, imgLabel } from './device.js';
+import { CUR, DEVICES, INSTALLED } from '../state.js';
+import { H, imgLabel, openDevice } from './device.js';
 import { hwOf, hwSet } from './devices.js';
 
 let TARGETS = [], SOURCES = [], PKGCOUNTS = {}, PKGVIEW = [], PKGCUR = null;
