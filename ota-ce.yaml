@@ -105,6 +105,10 @@ services:
     restart: always
     depends_on:
       - ota-lith
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+    volumes:
+      - lockbox-data:/data
     expose:
       - "9920"
 
@@ -161,6 +165,7 @@ services:
   #     - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
+  lockbox-data:
   ota-db:
   objects:
   ras-data:

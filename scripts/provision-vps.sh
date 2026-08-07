@@ -100,13 +100,20 @@ render_caddyfile() {
   mkdir -p "$APP_DIR/caddy"
   {
     printf '{\n\temail %s\n}\n\n' "$ACME_EMAIL"
-    printf '%s {\n\tencode gzip\n' "$RAS_PUBLIC_HOST"
+    printf '%s {\n' "$RAS_PUBLIC_HOST"
     printf '\t@provision path /provision-device.sh /install-reporter.sh /api/provision /api/provision/*\n'
     printf '\thandle @provision {\n\t\treverse_proxy console:80\n\t}\n'
+    # Tooling (torizoncore-builder / garage-sign) authenticates with a bearer token from
+    # /tuf/oauth2/token, not a browser session, so this path skips the console login.
+    # NOTE: deliberately NO `encode` here. TUF pins the sha256 AND length of each metadata file,
+    # so a compressed response can never verify — the same trap that broke every device update
+    # until the gateway stopped gzipping (see ota-ce/gateway.conf).
+    printf '\t@tuf path /tuf /tuf/*\n'
+    printf '\thandle @tuf {\n\t\treverse_proxy lockbox:9920\n\t}\n'
     if [ -n "${GITHUB_CLIENT_ID:-}" ]; then
-      printf '\thandle {\n\t\treverse_proxy oauth2-proxy:4180\n\t}\n'
+      printf '\thandle {\n\t\tencode gzip\n\t\treverse_proxy oauth2-proxy:4180\n\t}\n'
     else
-      printf '\thandle {\n\t\tbasic_auth {\n\t\t\t%s %s\n\t\t}\n\t\treverse_proxy console:80\n\t}\n' \
+      printf '\thandle {\n\t\tencode gzip\n\t\tbasic_auth {\n\t\t\t%s %s\n\t\t}\n\t\treverse_proxy console:80\n\t}\n' \
         "$CONSOLE_USER" "$CONSOLE_PASSWORD_HASH"
     fi
     printf '}\n'

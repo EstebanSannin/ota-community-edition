@@ -142,6 +142,11 @@ services:
     logging: *default-logging
     depends_on:
       - ota-lith
+    environment:
+      # Public base URL, baked into the credentials.zip it hands to torizoncore-builder.
+      PUBLIC_URL: https://${RAS_PUBLIC_HOST}
+    volumes:
+      - lockbox-data:/data          # the issued tooling credential (secret stored hashed)
     expose:
       - "9920"
 
@@ -166,6 +171,7 @@ services:
       - ras-data:/data
 
 volumes:
+  lockbox-data:
   ota-db:
   objects:
   ras-data:
