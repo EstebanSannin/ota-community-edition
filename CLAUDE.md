@@ -28,8 +28,9 @@ Everything else is small and deliberately boring — **stdlib-only Python sideca
 | `console` | 8080→80 | static SPA (ES modules, **no framework, no build step**) + nginx API proxy |
 | `provisioner` | 9900 | serves `provision-device.sh`, mints device credentials + enrollment tokens |
 | `ras` | 9080, 2222, 22000-3 | remote access (reverse-SSH bastion, RAC-compatible). Rust |
-| `ops` | 9910 | System page: container status, resources, SSE log streaming |
-| `lockbox` | 9920 | offline-update `.zip` exporter, `credentials.zip`, tooling token endpoint |
+| `ops` | 9910 | System page: container status, resources, SSE log streaming (observability overlay, on by default) |
+| `lockbox` | 9920 | offline-updates, `credentials.zip` + tooling token endpoint, and the bearer-auth `/tuf` + `/director` proxy for torizoncore-builder |
+| `auth` | 9930 | local-users login (`AUTH_MODE=local`): sessions, user CRUD, forward_auth hook. Admin/non-admin roles |
 | `gateway` | 30443→8443 | **device-facing** nginx: mTLS client certs |
 | `reverse-proxy` | 80 | internal host-based router to the ota-lith ports |
 | `caddy` | 80/443 | public TLS + login (only in the VPS deploy) |
@@ -99,8 +100,13 @@ Each of these cost real debugging time. They are not style preferences.
 5. **Single-file bind mounts pin the inode.** After editing `console/index.html` or an `nginx.conf`
    on the host, `docker restart` the container or it keeps serving the old file. Directory mounts
    (`console/js/`) pick changes up on their own.
-6. **Test device updates on the Verdin (`ssh real-dev`), not the QEMU.** The QEMU runs Torizon OS
-   *Minimal* — no Docker at all, so compose installs always fail there.
+6. **Two test devices; pick by what you're testing.** The **Verdin** (`ssh real-dev`, real ARM
+   hardware) reports status to the cloud correctly — use it when the console must show the right
+   device state. The **QEMU x86** (`ssh torizon-dev`, on the m920x host `claude@192.168.1.246`;
+   boot it there with `kvm`+`docker` group access) is a disposable Docker-variant device that
+   **installs updates fine but cannot report status** — its image is missing `/usr/bin/bl_actions.sh`
+   so the bootloader secondary can't produce a manifest, and the device shows `Error`/stale in the
+   console even after a successful install. Both are provisioned against the VPS.
 7. **Each device Secondary keeps its OWN TUF store** (`/var/sota/storage/*/sql.db`), separate from
    `/var/sota/sql.db`. A board previously registered elsewhere rejects our metadata with `A key has
    an incorrect associated key ID`. `provision-device.sh` clears it; if you see that error, that is
@@ -135,15 +141,31 @@ regression has more than once been pre-existing device state, and the reverse is
 plainly what was verified and what was not.
 
 **Run the smoke test before and after any change that could touch the core loop** (the stack,
-storage, the reposerver/director/provisioner/lockbox, the console proxy, or a compose/overlay
-change). It brings up the plain LAN stack and checks provision → publish → read-back → lockbox with
-no device needed:
+storage, reposerver/director/provisioner/lockbox/ops/ras/auth, the console proxy, or a
+compose/overlay change). `scripts/smoke-test.sh` brings up the plain LAN stack and, with no device
+needed, checks provision → publish → read-back → lockbox, that **every console view is present in the
+served `index.html`**, and — when the overlays are up — ops/System, ras, and the auth front:
 
 ```bash
-UP=1 BASE=http://192.168.64.2:8080 bash scripts/smoke-test.sh   # on the test VM
+UP=1 BASE=http://192.168.64.2:8080 bash scripts/smoke-test.sh                    # core + overlays
+AUTH_BASE=https://ota.local ADMIN_USER=admin ADMIN_PASS=… USER_USER=stefano USER_PASS=… \
+  bash scripts/smoke-test.sh   # + the auth front: gating, admin vs non-admin (run on the VM)
 ```
 
 "Before" gives you a known-good baseline so you can tell what a failure actually means; skipping it
 is how you end up unable to say whether *your* change broke something or it was already broken. This
-is not optional ceremony — it exists because we have shipped things (an opt-in that reasoned-correct
-but was never run on the default path) without ever exercising the path they could break.
+is not optional ceremony — it exists because we shipped an opt-in that reasoned-correct but was never
+run on the default path, and a `bootstrap.sh` that came up "healthy" with an uninitialised TUF repo.
+
+**Verifying a deploy: check the served output changed, not just that it returns 200.** A UI change
+was "deployed" but the browser still showed the old page — `console/js/*` (directory mount) was fresh
+while `index.html` (single-file mount, rule 5) was a stale inode. `curl`-ing the asset returned 200
+and misled me. After a UI change, `curl` the *page* and grep for the new element; after a service
+change, exercise the actual behaviour. My own ad-hoc one-liners have been wrong more than once this
+way — prefer the smoke test, and treat a hand-check that "passes" with suspicion until it's shown its
+work.
+
+**Device end-to-end** (provision → online docker-compose update → offline lockbox install) is done
+manually today against the QEMU x86 — see [docs/architecture.md](docs/architecture.md) and the memory
+notes. Scripting it as a repeatable rule is pending (offline updates now work via `torizoncore-builder
+platform lockbox`, which the console's "Build bundle…" surfaces).
