@@ -21,7 +21,7 @@ expiry (default 365 days).
 
 The console's **Build bundle…** button shows the exact command. `torizoncore-builder` pulls the
 container images and assembles the bundle, authenticating with your `credentials.zip` (from the
-**Tooling credentials** card — see [tooling-credentials.md](tooling-credentials.md)). In an empty
+**Settings → Tooling credentials** — see [tooling-credentials.md](tooling-credentials.md)). In an empty
 folder that contains `credentials.zip`:
 
 ```bash

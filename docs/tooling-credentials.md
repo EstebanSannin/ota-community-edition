@@ -17,7 +17,8 @@ The main thing you need it for is **canonicalizing** a docker-compose file. An o
 
 ## 1. Get the zip
 
-In the console, open **Packages** and use **Tooling credentials → Download credentials.zip**. The
+In the console, open **Settings → Tooling credentials → Download credentials.zip** (admin-only when
+local-users login is on). The
 browser session is what authorises it, so the download goes through your normal login.
 
 From a shell on the server (useful when scripting, and it bypasses the browser login):
