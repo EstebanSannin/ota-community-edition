@@ -20,10 +20,11 @@ async function loadMe(){
   const w = document.getElementById('whoami'); const n = document.getElementById('whoami-name');
   if(n) n.textContent = me.username + (me.admin ? '' : ' (user)');
   if(w) w.style.display = 'inline-flex';
-  const users = document.getElementById('nav-users-link');
-  const system = document.getElementById('nav-system-link');
-  if(users) users.style.display = me.admin ? '' : 'none';       // admin-only
-  if(system) system.style.display = me.admin ? '' : 'none';     // admin-only
+  // Admin-only areas: shown to admins, hidden from non-admins. (Left as-is when no local-users
+  // auth is in front — loadMe returns null above — so a LAN/GitHub deploy keeps them visible.)
+  for(const id of ['nav-users-link', 'nav-system-link', 'nav-settings-link']){
+    const el = document.getElementById(id); if(el) el.style.display = me.admin ? '' : 'none';
+  }
   return me;
 }
 

@@ -19,6 +19,7 @@
       <a data-view="remote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>Remote Access<span class="badge" id="nav-ra">0</span></a>
       <a data-view="lockbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>Offline updates<span class="badge" id="nav-lb">0</span></a>
       <a data-view="system" id="nav-system-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 5h16v10H4z"/><path d="M2 19h20M9 15v4M15 15v4"/></svg>System<span class="badge" id="nav-sys"></span></a>
+      <a data-view="settings" id="nav-settings-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H7a1.6 1.6 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V7a1.6 1.6 0 0 0 1.5 1H23a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>Settings</a>
       <a data-view="users" id="nav-users-link" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Users</a>
       <a href="apidocs/" target="_blank" rel="noopener" title="Open the API reference in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M9 9h.01M12 9h.01M8 13h8"/></svg>API<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;margin-left:auto;opacity:.6"><path d="M14 3h7v7M21 3l-9 9M5 5h5M5 5v14h14v-5"/></svg></a>
       <a onclick="openAbout()" style="cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>About</a>
@@ -120,16 +121,8 @@
             container images and assembles it (using your <span class="mono">credentials.zip</span>). Copy the result
             onto USB and point <span class="mono">offline_updates_source</span> at it on the device.</span></p>
           <div class="tablewrap" id="lb-list"><div class="empty">Loading…</div></div>
-        </div>
-
-        <div class="card"><header><h2>Tooling credentials</h2><span class="grow"></span>
-          <button class="btn sm" onclick="loadCredential()">Refresh</button>
-        </header>
-          <p class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-            <span>The equivalent of Torizon Cloud's <span class="mono">credentials.zip</span>, for this instance.
-            <span class="mono">torizoncore-builder</span> needs it to <b>canonicalize</b> a compose file — pinning every
-            image by digest, which a lockbox requires. See <span class="mono">docs/tooling-credentials.md</span>.</span></p>
-          <div class="tablewrap" id="cred-body"><div class="empty">Loading…</div></div>
+          <p class="muted" style="font-size:12.5px;margin:10px 2px 0">Building a bundle needs your
+          <span class="mono">credentials.zip</span> — get it under <b>Settings → Tooling credentials</b>.</p>
         </div>
       </section>
 
@@ -160,6 +153,19 @@
           <select id="sys-log-pick" style="width:auto;min-width:180px" onchange="startLogStream(this.value)"></select>
           <span class="termstatus" id="sys-log-status" style="margin-left:10px">—</span></header>
           <div class="logpane" id="sys-logpane"><div class="empty">Pick a service to stream its logs.</div></div>
+        </div>
+      </section>
+
+      <section class="view" id="v-settings">
+        <div class="card"><header><h2>Tooling credentials</h2><span class="grow"></span>
+          <button class="btn sm" onclick="loadCredential()">Refresh</button>
+        </header>
+          <p class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+            <span>This instance's <span class="mono">credentials.zip</span> — the equivalent of Torizon Cloud's.
+            <span class="mono">torizoncore-builder</span> and <span class="mono">garage-sign</span> use it to push,
+            canonicalize, and build lockboxes against this server. It can sign packages your whole fleet trusts —
+            keep it safe. See <span class="mono">docs/tooling-credentials.md</span>.</span></p>
+          <div class="tablewrap" id="cred-body"><div class="empty">Loading…</div></div>
         </div>
       </section>
 
