@@ -62,6 +62,7 @@ import com.advancedtelematic.libtuf_server.repo.client.ReposerverClient.{
   RootNotInKeyserver
 }
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.string.{Uri => UriString}
 
 //import com.advancedtelematic.tuf.reposerver.data.RepoDataType.Package
 import io.circe.generic.semiauto.*
@@ -128,6 +129,20 @@ object ReposerverClient {
     "could not find required private keys. The repository might be using offline signing"
   )
 
+  type SbomUri = Refined[String, UriString]
+
+  case class Sbom(filename: TargetFilename, uri: SbomUri)
+
+  object Sbom {
+    implicit val sbomCodec: Codec[Sbom] = deriveCodec
+  }
+
+  case class CreateSbomRequest(uri: SbomUri)
+
+  object CreateSbomRequest {
+    implicit val createSbomRequestCodec: Codec[CreateSbomRequest] = deriveCodec
+  }
+
 }
 
 trait ReposerverClient {
@@ -183,19 +198,19 @@ trait ReposerverClient {
                            origin: Option[String] = None,
                            originNot: Option[String] = None): Future[ClientPackage]
 
-  def searchTargetsV2(
-    namespace: Namespace,
-    offset: Option[Long],
-    limit: Option[Long],
-    origins: Seq[String] = Seq.empty,
-    nameContains: Option[String] = None,
-    name: Option[String] = None,
-    version: Option[String] = None,
-    hardwareIds: Seq[HardwareIdentifier] = Seq.empty,
-    hashes: Seq[TargetHash] = Seq.empty,
-    filenames: Seq[TargetFilename] = Seq.empty,
-    sortBy: Option[TargetItemsSort] = None,
-    sortDirection: Option[SortDirection] = None): Future[PaginationResult[ClientPackage]]
+  def searchTargetsV2(namespace: Namespace,
+                      offset: Option[Long],
+                      limit: Option[Long],
+                      origins: Seq[String] = Seq.empty,
+                      nameContains: Option[String] = None,
+                      name: Option[String] = None,
+                      version: Option[String] = None,
+                      hardwareIds: Seq[HardwareIdentifier] = Seq.empty,
+                      hashes: Seq[TargetHash] = Seq.empty,
+                      filenames: Seq[TargetFilename] = Seq.empty,
+                      sortBy: Option[TargetItemsSort] = None,
+                      sortDirection: Option[SortDirection] = None,
+                      hasSBOM: Option[Boolean] = None): Future[PaginationResult[ClientPackage]]
 
   def searchTargetsGroupedV2(
     namespace: Namespace,
@@ -209,7 +224,8 @@ trait ReposerverClient {
     hashes: Seq[TargetHash],
     filenames: Seq[Refined[String, ValidTargetFilename]],
     sortBy: Option[AggregatedTargetItemsSort],
-    sortDirection: Option[SortDirection]): Future[PaginationResult[ClientAggregatedPackage]]
+    sortDirection: Option[SortDirection],
+    hasSBOM: Option[Boolean]): Future[PaginationResult[ClientAggregatedPackage]]
 
   def setTargetComments(namespace: Namespace,
                         targetFilename: TargetFilename,
@@ -264,6 +280,20 @@ trait ReposerverClient {
   def refreshDelegatedRole(namespace: Namespace, fileName: DelegatedRoleName): Future[Unit]
 
   def hardwareIdsWithPackages(namespace: Namespace): Future[PaginationResult[HardwareIdentifier]]
+
+  def listSboms(namespace: Namespace,
+                offset: Option[Long],
+                limit: Option[Long]): Future[PaginationResult[ReposerverClient.Sbom]]
+
+  def findSbom(namespace: Namespace, filename: TargetFilename): Future[ReposerverClient.Sbom]
+
+  def findSbomRawUri(namespace: Namespace, filename: TargetFilename): Future[URI]
+
+  def persistSbom(namespace: Namespace,
+                  filename: TargetFilename,
+                  req: ReposerverClient.CreateSbomRequest): Future[ReposerverClient.Sbom]
+
+  def deleteSbom(namespace: Namespace, filename: TargetFilename): Future[Unit]
 }
 
 object ReposerverHttpClient extends ServiceHttpClientSupport {
@@ -445,19 +475,19 @@ class ReposerverHttpClient(reposerverUri: Uri,
     execHttpUnmarshalledWithNamespace[ClientPackage](namespace, req).ok
   }
 
-  def searchTargetsV2(
-    namespace: Namespace,
-    offset: Option[Long],
-    limit: Option[Long],
-    origins: Seq[String],
-    nameContains: Option[String],
-    name: Option[String],
-    version: Option[String],
-    hardwareIds: Seq[HardwareIdentifier],
-    hashes: Seq[TargetHash],
-    filenames: Seq[Refined[String, ValidTargetFilename]],
-    sortBy: Option[TargetItemsSort],
-    sortDirection: Option[SortDirection]): Future[PaginationResult[ClientPackage]] = {
+  def searchTargetsV2(namespace: Namespace,
+                      offset: Option[Long],
+                      limit: Option[Long],
+                      origins: Seq[String],
+                      nameContains: Option[String],
+                      name: Option[String],
+                      version: Option[String],
+                      hardwareIds: Seq[HardwareIdentifier],
+                      hashes: Seq[TargetHash],
+                      filenames: Seq[Refined[String, ValidTargetFilename]],
+                      sortBy: Option[TargetItemsSort],
+                      sortDirection: Option[SortDirection],
+                      hasSBOM: Option[Boolean]): Future[PaginationResult[ClientPackage]] = {
 
     val params = PackageSearchParameters(
       origin = origins,
@@ -467,7 +497,8 @@ class ReposerverHttpClient(reposerverUri: Uri,
       version = version,
       hardwareIds = hardwareIds,
       hashes = hashes,
-      filenames = filenames
+      filenames = filenames,
+      hasSBOM = hasSBOM
     )
 
     val req = HttpRequest(
@@ -503,7 +534,8 @@ class ReposerverHttpClient(reposerverUri: Uri,
     hashes: Seq[TargetHash],
     filenames: Seq[Refined[String, ValidTargetFilename]],
     sortBy: Option[AggregatedTargetItemsSort],
-    sortDirection: Option[SortDirection]): Future[PaginationResult[ClientAggregatedPackage]] = {
+    sortDirection: Option[SortDirection],
+    hasSBOM: Option[Boolean] = None): Future[PaginationResult[ClientAggregatedPackage]] = {
     val req = HttpRequest(
       HttpMethods.GET,
       uri = apiV2Uri(Path(s"user_repo/grouped-search"))
@@ -531,6 +563,7 @@ class ReposerverHttpClient(reposerverUri: Uri,
               ++ sortDirection
                 .map(sortD => Map("sortDirection" -> sortD.entryName))
                 .getOrElse(Map.empty)
+              ++ hasSBOM.map(s => Map("hasSBOM" -> s.toString)).getOrElse(Map.empty)
           )
         )
     )
@@ -793,6 +826,49 @@ class ReposerverHttpClient(reposerverUri: Uri,
     namespace: Namespace): Future[PaginationResult[HardwareIdentifier]] = {
     val req = HttpRequest(HttpMethods.GET, uri = apiV2Uri(Path(s"user_repo/hardwareids-packages")))
     execHttpUnmarshalledWithNamespace[PaginationResult[HardwareIdentifier]](namespace, req).ok
+  }
+
+  override def listSboms(namespace: Namespace,
+                         offset: Option[Long],
+                         limit: Option[Long]): Future[PaginationResult[ReposerverClient.Sbom]] = {
+    val req = HttpRequest(
+      HttpMethods.GET,
+      uri = apiUri(Path("sboms")).withQuery(Query(paginationParams(offset, limit)))
+    )
+    execHttpUnmarshalledWithNamespace[PaginationResult[ReposerverClient.Sbom]](namespace, req).ok
+  }
+
+  override def findSbom(namespace: Namespace,
+                        filename: TargetFilename): Future[ReposerverClient.Sbom] = {
+    val req = HttpRequest(HttpMethods.GET, uri = apiUri(Path("sboms") / filename.value))
+    execHttpUnmarshalledWithNamespace[ReposerverClient.Sbom](namespace, req).ok
+  }
+
+  override def findSbomRawUri(namespace: Namespace, filename: TargetFilename): Future[URI] = {
+    val req = HttpRequest(HttpMethods.GET, uri = apiUri(Path("sboms") / "raw" / filename.value))
+    execHttpFullWithNamespace[Unit](namespace, req).ok.map { resp =>
+      resp.httpResponse.headers.find(_.is("location")) match {
+        case Some(locationHeader) => new URI(locationHeader.value)
+        case None                 => throw NotFound
+      }
+    }
+  }
+
+  override def persistSbom(
+    namespace: Namespace,
+    filename: TargetFilename,
+    req: ReposerverClient.CreateSbomRequest): Future[ReposerverClient.Sbom] = {
+    val httpReq = HttpRequest(
+      HttpMethods.PUT,
+      uri = apiUri(Path("sboms") / filename.value),
+      entity = HttpEntity(ContentTypes.`application/json`, req.asJson.noSpaces)
+    )
+    execHttpUnmarshalledWithNamespace[ReposerverClient.Sbom](namespace, httpReq).ok
+  }
+
+  override def deleteSbom(namespace: Namespace, filename: TargetFilename): Future[Unit] = {
+    val req = HttpRequest(HttpMethods.DELETE, uri = apiUri(Path("sboms") / filename.value))
+    execHttpUnmarshalledWithNamespace[Unit](namespace, req).ok
   }
 
 }
