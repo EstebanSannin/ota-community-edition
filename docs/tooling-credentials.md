@@ -39,7 +39,7 @@ The zip contains:
 | `targets.pub` / `targets.sec` | the targets keypair — this is what lets tooling *sign* new targets |
 
 **The secret is shown once.** Minting a new credential replaces the old one; `DELETE
-/api/lockbox/credentials` revokes without issuing a replacement. Treat the zip like a password —
+/api/credentials` revokes without issuing a replacement. Treat the zip like a password —
 `targets.sec` can sign packages your whole fleet will trust.
 
 ## 2. Object storage is required to push

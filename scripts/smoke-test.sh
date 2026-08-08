@@ -94,15 +94,19 @@ lb_code=$(curl -s -o "$WORK/lb.out" -w '%{http_code}' -X POST -H 'Content-Type: 
   --data @"$WORK/values.json" "$D/offline-updates/$LOCKBOX")
 [ "$lb_code" = "200" ] && ok "director: created offline-update role" || bad "director: offline-update create failed (http $lb_code)"
 
-zip_code=$(code "$BASE/api/lockbox/$LOCKBOX.zip" "$WORK/lb.zip")
-if [ "$zip_code" = "200" ] && python3 - "$WORK/lb.zip" "$TARGET" "$WORK/app.yml" <<'PY' 2>/dev/null; then
-import sys,zipfile
-z=zipfile.ZipFile(sys.argv[1]); img=f"update/images/{sys.argv[2]}"
-sys.exit(0 if img in z.namelist() and z.read(img)==open(sys.argv[3],"rb").read() else 1)
-PY
-  ok "lockbox: exported .zip carries the target byte-identical"
+# The role must be signed + fetchable, and indexed by the offline-snapshot. (The removable-media
+# bundle itself is built by `torizoncore-builder platform lockbox`, not exported here.)
+role_code=$(code "$D/offline-updates/$LOCKBOX.json" "$WORK/lb.json")
+if [ "$role_code" = "200" ] && python3 -c "import json,sys;d=json.load(open('$WORK/lb.json'));sys.exit(0 if (d.get('signed',{}).get('targets') and d.get('signatures')) else 1)" 2>/dev/null; then
+  ok "director: offline-update role is signed and fetchable"
 else
-  bad "lockbox: export missing/mismatched payload (http $zip_code)"
+  bad "director: offline-update role not signed/fetchable (http $role_code)"
+fi
+snap_code=$(code "$D/offline-snapshot.json" "$WORK/snap.json")
+if [ "$snap_code" = "200" ] && grep -q "$LOCKBOX.json" "$WORK/snap.json" 2>/dev/null; then
+  ok "director: offline-snapshot indexes the lockbox"
+else
+  bad "director: offline-snapshot missing the lockbox (http $snap_code)"
 fi
 
 note "console renders the current pages (catches a stale bind-mounted index.html)"

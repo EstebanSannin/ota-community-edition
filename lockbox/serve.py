@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Lockbox exporter: packs an offline update (Torizon "Lockbox") into a .zip the browser downloads.
+"""Lockbox + tooling support service.
 
-The director already signs the offline TUF roles; this service just collects everything a device
-needs and lays it out the way aktualizr's OfflineUpdateFetcher expects:
+Offline updates follow the standard Torizon workflow: the console creates the signed offline-update
+roles (in the director), and `torizoncore-builder platform lockbox` pulls the container images and
+assembles the removable-media bundle. This service exposes what that tooling needs, plus the lockbox
+list for the console:
 
-    update/
-      metadata/director/     root.json, offline-snapshot.json, <lockbox>.json
-      metadata/image-repo/   root.json, snapshot.json, targets.json, timestamp.json
-      images/                one file per target in the lockbox
-
-so no torizoncore-builder (or any other external tool) is needed.
-
-    GET /api/lockboxes                -> JSON list of lockboxes (name + target count)
-    GET /api/lockbox/<name>.zip       -> the bundle
+    GET  /api/lockboxes            -> JSON list of lockboxes (from the offline-snapshot role)
+    POST /api/credentials          -> mint + stream credentials.zip (revokes the previous)
+    GET/DELETE /api/credentials    -> current credential / revoke
+    POST /tuf/oauth2/token[/token] -> client_credentials -> bearer token
+    /tuf/* , /director/*           -> bearer-authenticated proxy to the reposerver / director,
+                                      so torizoncore-builder can fetch metadata + push targets
 """
 import base64, hashlib, hmac, http.server, io, json, os, re, secrets, sqlite3, threading, time
 import urllib.error, urllib.parse, urllib.request, zipfile
@@ -24,38 +23,6 @@ DIRECTOR_ROOT = os.environ.get("DIRECTOR_ROOT", "http://ota-lith:7300")
 KEYSERVER = os.environ.get("KEYSERVER_URL", "http://ota-lith:7200")
 NAMESPACE = os.environ.get("OTA_NAMESPACE", "default")
 PORT = int(os.environ.get("LOCKBOX_PORT", "9920"))
-# aktualizr's offline_updates_source points at this folder name (Toradex's documented default)
-BUNDLE_DIR = os.environ.get("LOCKBOX_BUNDLE_DIR", "update")
-SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
-
-IMAGE_REPO_ROLES = ("root.json", "snapshot.json", "targets.json", "timestamp.json")
-
-README = """This is an offline update bundle (a "Lockbox") for Torizon OS.
-
-Layout
-------
-  metadata/director/     signed offline TUF roles (the offline-snapshot indexes the lockboxes)
-  metadata/image-repo/   image repository metadata
-  images/                the update artifacts themselves
-
-How to use it
--------------
-1. Unzip onto removable media, keeping the "{bundle}" folder at its root, e.g. /media/usb/{bundle}
-2. On the device, enable offline updates once by creating
-   /etc/sota/conf.d/99-offline-updates.toml:
-
-       [uptane]
-       enable_offline_updates = true
-       offline_updates_source = "/media/usb/{bundle}"
-
-   (point offline_updates_source at wherever the folder is mounted)
-3. Restart the client:  sudo systemctl restart aktualizr-torizon
-   It logs "Offline Updates are enabled" when the setting is picked up.
-
-Note: container images are NOT included in this bundle — the images/ folder holds the
-targets stored on the OTA server (e.g. docker-compose files). A device installing a
-container application still needs access to the registry for the image layers.
-""".replace("{bundle}", BUNDLE_DIR)
 
 
 def fetch(url):
@@ -82,42 +49,6 @@ def lockbox_targets(name):
     return signed.get("targets", {}), signed.get("expires", "")
 
 
-def add_root_chain(z, dest, base, latest):
-    """Write root.json plus every earlier version.
-
-    A consumer only trusts a new root if it can walk the rotation chain from the version it
-    already has, and the device's Secondaries may sit on an older root than the Primary — so
-    ship 1.root.json … N.root.json, not just the latest.
-    """
-    z.writestr(f"{dest}/root.json", latest)
-    version = json.loads(latest).get("signed", {}).get("version", 1)
-    for v in range(1, version + 1):
-        try:
-            z.writestr(f"{dest}/{v}.root.json", fetch(f"{base}/{v}.root.json"))
-        except urllib.error.HTTPError:
-            pass                            # a gap in the chain is the server's business, not ours
-
-
-def build_zip(name):
-    targets, _ = lockbox_targets(name)
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        d = f"{BUNDLE_DIR}/metadata/director"
-        add_root_chain(z, d, f"{DIRECTOR}/admin/repo", fetch(f"{DIRECTOR}/admin/repo/root.json"))
-        z.writestr(f"{d}/offline-snapshot.json", fetch(f"{DIRECTOR}/admin/repo/offline-snapshot.json"))
-        z.writestr(f"{d}/{name}.json", fetch(f"{DIRECTOR}/admin/repo/offline-updates/{name}.json"))
-        ir = f"{BUNDLE_DIR}/metadata/image-repo"
-        add_root_chain(z, ir, f"{REPOSERVER}/user_repo", fetch(f"{REPOSERVER}/user_repo/root.json"))
-        for role in IMAGE_REPO_ROLES:
-            if role == "root.json":
-                continue                    # already written with its chain above
-            z.writestr(f"{ir}/{role}", fetch(f"{REPOSERVER}/user_repo/{role}"))
-        for filename in targets:
-            safe = filename.replace("..", "_").lstrip("/")
-            z.writestr(f"{BUNDLE_DIR}/images/{safe}",
-                       fetch(f"{REPOSERVER}/user_repo/targets/{urllib.parse.quote(filename)}"))
-        z.writestr(f"{BUNDLE_DIR}/README.txt", README)
-    return buf.getvalue()
 
 
 # ---------------------------------------------------------------------------
@@ -304,21 +235,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pfx = proxy_prefix(path)
         if pfx:
             return proxy_to_ota(self, self.path, "GET", pfx)       # keep the query string
-
-        m = re.match(r"^/api/lockbox/(.+)\.zip$", path)
-        if m:
-            name = urllib.parse.unquote(m.group(1))
-            if not SAFE_NAME.match(name):
-                return self._send(400, json.dumps({"error": "invalid lockbox name"}))
-            try:
-                data = build_zip(name)
-            except urllib.error.HTTPError as e:
-                code = 404 if e.code == 404 else 502
-                return self._send(code, json.dumps({"error": f"{name}: upstream {e.code}"}))
-            except Exception as e:
-                return self._send(502, json.dumps({"error": str(e)}))
-            return self._send(200, data, "application/zip",
-                              [("Content-Disposition", f'attachment; filename="{name}.zip"')])
 
         self._send(404, json.dumps({"error": "not found"}))
 

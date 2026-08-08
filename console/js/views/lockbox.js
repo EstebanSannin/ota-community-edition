@@ -1,4 +1,5 @@
-// Offline updates ("Lockboxes"): list, create from packages, download as .zip, delete.
+// Offline updates ("Lockboxes"): list, create from packages, delete, and show the
+// `torizoncore-builder platform lockbox` command that builds the removable-media bundle.
 import { api, esc, rapi, relTime } from '../lib/api.js';
 import { uiConfirm } from '../lib/dialogs.js';
 import { expose, toast } from '../lib/ui.js';
