@@ -1,6 +1,20 @@
 # Upstream divergence: where `repos/` stands against uptane/*
 
-Analysis date **2026-08-07**, against `master` of each upstream repo.
+## Update log
+
+- **2026-08-08 — ota-tuf updated to upstream master (`8a0cb2b2`).** `git subtree pull` merged cleanly
+  with a single conflict in `S3TargetStoreEngine.scala`, resolved by combining our endpoint/signing
+  patch with upstream's new `DefaultAWSCredentialsProviderChain` (IRSA) support (the unused
+  `CannedAccessControlList` import was dropped). Validated before deploy — isolated containerized
+  build on a spare host: compiles, `ota-lith` boots healthy (all migrations incl. the new **V21
+  SBOM** apply), and an S3 round-trip through MinIO returns byte-identically. Then deployed to the
+  VPS and reverified: smoke test 15/15, pre-existing S3 targets read back, and a real Verdin device
+  installed an update (`Success`). **Gains:** SBOM support, the `n.root.json` `JsonSignedPayload`
+  byte-fidelity fix, and IRSA/instance-profile credentials. treehub was already current; director
+  was left as-is (pure scalafmt churn, no functional gain, and it carries the V9-migration trap).
+  Rollback image on the VPS: `samnite/ota-lith:prerollback-otatuf`.
+
+Original analysis date **2026-08-07**, against `master` of each upstream repo.
 
 `repos/` was vendored with `git subtree`, so every import recorded the exact upstream commit in a
 `git-subtree-split` trailer. That makes the base identifiable with certainty rather than by guesswork
@@ -12,7 +26,7 @@ Analysis date **2026-08-07**, against `master` of each upstream repo.
 |---|---|---|---|---|---|
 | **treehub** | `ba09f983` | `ba09f983` | **0 commits** | **none** | **zero — already identical** |
 | **director** | `855edc95` | `e43319c8` | 52 commits | 3 migration files | low, but **no functional gain** |
-| **ota-tuf** | `0f49b4f8` (`v6.1.0~45`) | `a95c714c` (`v6.1.0-82`) | 191 commits | 3 files, +113/−23 | moderate (~half a day) |
+| **ota-tuf** | ~~`0f49b4f8`~~ **now `8a0cb2b2` (master, updated 2026-08-08)** | `8a0cb2b2` | **0 (current)** | S3 patch (re-applied on master) | done |
 
 The headline: **our divergence from upstream is tiny** — six files across three projects. The
 interesting drift is all in ota-tuf.

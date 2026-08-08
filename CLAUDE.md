@@ -91,11 +91,12 @@ Each of these cost real debugging time. They are not style preferences.
 3. **Recreating `ota-lith` changes its container IP, and the nginx proxies cache the old one.**
    `console`, `reverse-proxy` and `gateway` then 502 — *including for devices*. Always:
    `docker restart ota-community-edition-{console,reverse-proxy,gateway}-1`.
-4. **`ota-lith` carries a local patch — check the registry image has it before pulling.** The
-   reposerver is patched to accept a non-AWS S3 endpoint; an unpatched image silently supports only
-   local-disk storage. `samnite/ota-lith:0.2.0`/`:latest` **do** contain it (verified 2026-08-07), so
-   pulling is safe today. If you ever rebuild from a machine whose tree lacks the patch, you can undo
-   that guarantee. Rollback tag on the VPS: `samnite/ota-lith:prerollback-s3`. Verify with:
+4. **The VPS runs a LOCAL `ota-lith` build, ahead of the registry — don't `docker compose pull` it.**
+   It carries the non-AWS S3-endpoint patch **and** (since 2026-08-08) vendored ota-tuf at upstream
+   master (SBOM, root.json fidelity). The published `samnite/ota-lith:0.2.0`/`:latest` have the S3
+   patch but the OLDER ota-tuf, so pulling would quietly roll back the upgrade. Rebuild from source
+   instead (Commands above). Rollback image on the VPS: `samnite/ota-lith:prerollback-otatuf` (and
+   the older `:prerollback-s3`). Sanity-check a jar has the S3 patch with:
    `python3 -c "import zipfile;print(b'publicEndpointUrl' in zipfile.ZipFile('repo.jar').read('com/advancedtelematic/tuf/reposerver/target_store/S3TargetStoreEngine.class'))"`
 5. **Single-file bind mounts pin the inode.** After editing `console/index.html` or an `nginx.conf`
    on the host, `docker restart` the container or it keeps serving the old file. Directory mounts
