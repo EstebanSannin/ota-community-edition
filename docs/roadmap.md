@@ -49,15 +49,15 @@ that stopped reporting is invisible in the current UI.
 
 ## Operational debt
 
-**~~Push the patched `ota-lith` image to a registry.~~ Done — 0.2.0, 2026-08-07.** All five images
-(`ota-lith`, `ota-ce-provisioner`, `ota-ce-lockbox`, `ota-ce-ops`, `ras`) are now published multi-arch
-as `0.2.0` and `latest`; the S3 patch is verified present in the published jar. Note the three
-sidecars had **never** been pushed before, and `ras` has no `build:` fallback, so a fresh deploy
-elsewhere previously could not obtain it at all.
+**~~Push the images to a registry.~~ Done — 0.3.0, 2026-08-08.** All **six** images
+(`ota-lith`, `ota-ce-provisioner`, `ota-ce-lockbox`, `ota-ce-ops`, `ota-ce-auth`, `ras`) are published
+multi-arch (amd64+arm64) as `0.3.0` and `latest`. 0.3.0 carries the ota-tuf-master upgrade, the
+`/director` lockbox proxy, and the auth service (which had never been published). Built on the m920x
+host.
 
-Remaining: the VPS is still *running* its locally-built `ota-lith` (identical content, different
-image id). Repointing it at the registry image is a `pull` + recreate — cheap, but it briefly
-interrupts device polling and needs the nginx proxies restarted afterwards.
+Remaining: the VPS still *runs* a locally-built `ota-lith` (content-identical to `0.3.0`). Repointing
+it at the registry (`OTA_CE_TAG=0.3.0`, `pull` + recreate + restart the nginx proxies) would make the
+registry the source of truth and retire CLAUDE.md rule 4.
 
 **Pin the MinIO image.** `compose.s3.yaml` uses `minio/minio:latest` while everything else is pinned
 (`nginx:1.27`, `mariadb:10.11`). Pin it once a known-good release tag is confirmed.
