@@ -42,7 +42,7 @@ async function renderLockboxes(){
                  + (pkgs > 3 ? ` <span class="muted">+${pkgs - 3}</span>` : '');
       return `<tr><td><b>${n}</b></td><td>${list || '<span class="muted">—</span>'}</td>`
            + `<td class="muted">${l.expires ? esc(relTime(l.expires)) : '—'}</td>`
-           + `<td class="right"><button class="btn sm" onclick="downloadLockbox('${nj}')">⤓ Download .zip</button> `
+           + `<td class="right"><button class="btn sm" onclick="lockboxCommand('${nj}')">Build bundle…</button> `
            + `<button class="btn sm danger" onclick="deleteLockbox('${nj}')">Delete</button></td></tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -52,9 +52,42 @@ function setCounts(n){
   const b = document.getElementById('nav-lb'); if(b) b.textContent = n;
 }
 
-function downloadLockbox(name){
-  toast('Building ' + name + '.zip…');
-  window.location = '/api/lockbox/' + encodeURIComponent(name) + '.zip';
+// The standard Torizon workflow: the server holds the signed lockbox metadata; torizoncore-builder
+// pulls the container images and assembles the removable-media bundle, authenticating with the
+// credentials.zip from the Tooling credentials card.
+function lockboxCommand(name){
+  const cmd = `docker run --rm -it \\
+  -v "$PWD":/workdir -w /workdir \\
+  -v /deploy -v /var/run/docker.sock:/var/run/docker.sock \\
+  torizon/torizoncore-builder:3 \\
+  platform lockbox ${name} \\
+    --credentials credentials.zip \\
+    --output-directory ${name}-lockbox \\
+    --platform linux/amd64`;
+  const ov = document.createElement('div'); ov.className = 'modal open';
+  ov.innerHTML = `<div class="m ramodal"><header><h3>Build the “${esc(name)}” bundle</h3></header>
+    <div class="form" style="padding:16px 20px;gap:12px">
+      <p class="muted" style="margin:0">The lockbox metadata is signed and ready on the server.
+      <b>torizoncore-builder</b> pulls the container images and assembles the bundle for a USB stick —
+      the same workflow as Torizon Cloud.</p>
+      <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7">
+        <li>Download <span class="mono">credentials.zip</span> from <b>Tooling credentials</b> (below) into an empty folder.</li>
+        <li>In that folder, run:</li>
+      </ol>
+      <textarea readonly rows="8" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;white-space:pre" id="lb-cmd">${esc(cmd)}</textarea>
+      <p class="muted" style="margin:0;font-size:12.5px">Use <span class="mono">--platform linux/arm64</span> for a Verdin/ARM board.
+      Then copy the <span class="mono">${esc(name)}-lockbox</span> folder onto the device's offline-update media.</p>
+    </div>
+    <footer><button class="btn mcancel">Close</button><span class="grow"></span>
+      <button class="btn primary" id="lb-copy">Copy command</button></footer></div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector('.mcancel').onclick = close;
+  ov.addEventListener('mousedown', e => { if(e.target === ov) close(); });
+  ov.querySelector('#lb-copy').onclick = () => {
+    const ta = ov.querySelector('#lb-cmd'); ta.select();
+    navigator.clipboard.writeText(cmd).then(() => toast('Command copied'), () => toast('Select and copy manually'));
+  };
 }
 
 async function deleteLockbox(name){
@@ -112,4 +145,4 @@ async function openNewLockbox(){
 
 export { renderLockboxes };
 
-expose({ deleteLockbox, downloadLockbox, openNewLockbox, renderLockboxes });   // referenced by inline on*= handlers
+expose({ deleteLockbox, lockboxCommand, openNewLockbox, renderLockboxes });   // referenced by inline on*= handlers

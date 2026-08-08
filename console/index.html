@@ -114,9 +114,10 @@
           <button class="btn sm primary" onclick="openNewLockbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New lockbox</button>
         </header>
           <p class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-            <span>A lockbox is a signed bundle of packages a device can install with no network. Download it,
-            unzip onto a USB stick, and point <span class="mono">offline_updates_source</span> at the
-            <span class="mono">update</span> folder on the device. The bundle includes a README with the exact steps.</span></p>
+            <span>A lockbox is a signed set of packages a device can install with no network. Create it here, then
+            <b>Build bundle…</b> shows the <span class="mono">torizoncore-builder</span> command that pulls the
+            container images and assembles it (using your <span class="mono">credentials.zip</span>). Copy the result
+            onto USB and point <span class="mono">offline_updates_source</span> at it on the device.</span></p>
           <div class="tablewrap" id="lb-list"><div class="empty">Loading…</div></div>
         </div>
 
