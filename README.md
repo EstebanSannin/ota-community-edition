@@ -113,8 +113,10 @@ The `*.ota.ce` hostnames are only needed for manual admin scripts (`get-credenti
 127.0.0.1 reposerver.ota.ce keyserver.ota.ce director.ota.ce treehub.ota.ce ota.ce
 ```
 
-- Deploy via the API or [ota-cli](https://github.com/simao/ota-cli/): see
-  [docs/api-updates.md](docs/api-updates.md) and [docs/updates-ota-cli.md](docs/updates-ota-cli.md).
+- Deploy from the **console** (Packages → deploy), or with `torizoncore-builder` — see
+  [docs/tooling-credentials.md](docs/tooling-credentials.md) and the API reference at
+  `console/apidocs/`. (Older raw-API / `ota-cli` notes are archived under
+  [docs/archive/](docs/archive/) — they predate the console and reference the removed `campaigner`.)
 - End-to-end test helpers (aktualizr build, provision/update/source scripts): see [test/](test/README.md).
 
 ## Documentation
