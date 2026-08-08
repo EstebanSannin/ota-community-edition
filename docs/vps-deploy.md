@@ -58,19 +58,30 @@ docker run --rm caddy caddy hash-password --plaintext 'the-shared-password'
 ```
 
 ## 5. Images
-`ota-lith` + `ota-ce-provisioner` are pulled from `$OTA_CE_NS`. Build `ras` locally (it's small):
-```bash
-docker build -t $OTA_CE_NS/ras:latest remote-access/ras
-```
-(or `NS=$OTA_CE_NS ./release.sh` to build+push all three from a build host.)
+All six images (`ota-lith`, `ota-ce-provisioner`, `ota-ce-lockbox`, `ota-ce-ops`, `ota-ce-auth`,
+`ras`) are published multi-arch under `$OTA_CE_NS` and pulled automatically — nothing to build. To
+cut your own release from a build host: `NS=$OTA_CE_NS TAG=0.3.0 ./release.sh` (see release.sh for
+the QEMU/binfmt prerequisite for arm64).
 
 ## 6. Bring it up
 ```bash
-./bootstrap.sh                                   # generates certs (ota-ce-gen/) then starts the release stack
-docker compose -f compose.release.yaml -f compose.public.yaml up -d   # add Caddy TLS+password front
+./bootstrap.sh                                   # certs (ota-ce-gen/) + the release stack + the System page
+docker compose -f compose.release.yaml -f compose.public.yaml up -d   # add the Caddy TLS + login front
 ```
-Visit `https://ota.example.com` → browser asks for the shared password → the console.
-(For per-user GitHub sign-in instead of one shared password, see [console-auth.md](console-auth.md).)
+`bootstrap.sh` includes the **observability overlay by default** (the System page); set
+`OBSERVABILITY=0` to skip it. Visit `https://ota.example.com` → the login → the console.
+
+**Optional overlays** (add their `-f compose.*.yaml` to the `up` command, and keep them on every
+subsequent `up`):
+
+| Want | Overlay + docs |
+|---|---|
+| GitHub sign-in (per-user) instead of the shared password | `compose.oauth2.yaml` — [console-auth.md](console-auth.md) |
+| Local user accounts (offline-capable, roles) | `compose.auth.yaml`, `AUTH_MODE=local` — [console-auth.md](console-auth.md) |
+| `torizoncore-builder platform push` / large artifacts | `compose.s3.yaml`, `MINIO_ROOT_PASSWORD` — [tooling-credentials.md](tooling-credentials.md), [operations.md](operations.md) §9 |
+
+The live VPS runs `release + public + oauth2 + observability + s3`. See [operations.md](operations.md)
+§2 for the full service list.
 
 ## 7. Provision a device (per device)
 Open the console → **Provision device**: it generates a **short-lived enrollment token** and shows a

@@ -17,16 +17,32 @@ All commands below assume you are on the VPS. The project lives in
 
 ## 2. The services
 
-| Service        | Container name                          | What it is |
-|----------------|-----------------------------------------|------------|
-| `ota-lith`     | `ota-community-edition-ota-lith-1`      | The OTA monolith (director, repo server, device-registry). The one you'll read most. |
-| `db`           | `ota-community-edition-db-1`            | MariaDB (backing store for ota-lith). |
-| `gateway`      | `ota-community-edition-gateway-1`       | Device-facing TLS gateway (mTLS, port 30443). |
-| `ras`          | `ota-community-edition-ras-1`           | Remote access: SSH bastion + web-terminal + session API. |
-| `provisioner`  | `ota-community-edition-provisioner-1`   | Device enrollment + token minting + install scripts. |
-| `console`      | `ota-community-edition-console-1`       | The web console (nginx serving the SPA + API proxy). |
-| `caddy`        | `ota-community-edition-caddy-1`         | Public TLS front + password wall. |
-| `reverse-proxy`| `ota-community-edition-reverse-proxy-1` | Internal router in front of ota-lith. |
+Container names are `ota-community-edition-<service>-1`.
+
+**Core stack** (`compose.release.yaml`) — always present:
+
+| Service        | What it is |
+|----------------|------------|
+| `ota-lith`     | The OTA monolith (director, reposerver, keyserver, treehub, device-registry). The one you'll read most. |
+| `db`           | MariaDB (backing store for ota-lith). |
+| `gateway`      | Device-facing TLS gateway (mTLS, port 30443). |
+| `reverse-proxy`| Internal host-based router in front of the ota-lith ports. |
+| `console`      | The web console (nginx serving the SPA + same-origin API proxy). |
+| `provisioner`  | Device enrollment + token minting + install scripts. |
+| `lockbox`      | Offline updates, `credentials.zip` + tooling token endpoint, and the bearer-auth `/tuf` + `/director` proxy for torizoncore-builder. |
+| `ras`          | Remote access: SSH bastion + web-terminal + session API. |
+
+**Overlays** — only present when their compose file is included (see §8, §9, and docs/console-auth.md):
+
+| Service              | Overlay file                  | What it is |
+|----------------------|-------------------------------|------------|
+| `caddy`              | `compose.public.yaml`         | Public TLS front + the login layer (password / GitHub / local-users). |
+| `oauth2-proxy`       | `compose.oauth2.yaml`         | GitHub sign-in (when `GITHUB_CLIENT_ID` is set). |
+| `auth`               | `compose.auth.yaml`           | Local-users login: sessions, user CRUD, admin/non-admin roles, forward_auth hook. |
+| `ops` + `socket-proxy` | `compose.observability.yaml`| The System page — read-only Docker socket proxy + the `ops` sidecar. **On by default via bootstrap.** |
+| `minio` + `minio-init` | `compose.s3.yaml`           | S3-compatible target storage (needed for `torizoncore-builder platform push`). |
+
+The live VPS runs `release + public + oauth2 + observability + s3`. A LAN/local instance is typically `release` (+ `auth` + `public` for a login).
 
 Quick status of everything:
 
@@ -73,21 +89,25 @@ From `/opt/ota-community-edition`:
 
 ```bash
 cd /opt/ota-community-edition
-docker compose -f compose.release.yaml -f compose.public.yaml --env-file .env logs -f --tail 50
+CF="-f compose.release.yaml -f compose.public.yaml -f compose.oauth2.yaml -f compose.observability.yaml -f compose.s3.yaml"
+docker compose $CF --env-file .env logs -f --tail 50
 # one service, same syntax:
-docker compose -f compose.release.yaml -f compose.public.yaml --env-file .env logs -f ota-lith
+docker compose $CF --env-file .env logs -f ota-lith
 ```
 
-(The long `-f compose.* --env-file .env` prefix is how this instance was brought up.
-`docker logs <container>` needs none of it.)
+(The full `-f compose.*` list is how the VPS was brought up — see §2. `docker logs
+<container>` needs none of it.)
 
 ### What each service is good for
 
 - **Device won't provision / update** → `ota-lith` (and `gateway` for the mTLS handshake).
-- **Console login / password / TLS cert** → `caddy`.
+- **Console login / TLS cert** → `caddy`; **GitHub sign-in** → `oauth2-proxy`; **local-users login / user management** → `auth`.
 - **Console API 502 / proxy errors** → `console` (nginx).
+- **Offline updates, `credentials.zip`, `torizoncore-builder` (`/tuf`, `/director`)** → `lockbox`.
+- **Target upload/download or `platform push` storage errors** → `lockbox` + `ota-lith` (and `minio` when S3 storage is on).
 - **Remote access / web terminal** → `ras` (look for `armed session`, `bastion:`, `web-terminal:`).
 - **Enrollment token / install script** → `provisioner`.
+- **System page empty / metrics** → `ops` (and `socket-proxy`).
 
 ## 4. Host-level logs & resources
 

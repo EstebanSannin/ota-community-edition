@@ -12,6 +12,17 @@ by third parties.
 > your own packages and delegated OSTree updates. See **[docs/status-report.md](docs/status-report.md)**
 > for the full picture of what works.
 
+## What it does
+
+- **Provision** real Torizon OS devices with a one-line, token-gated command (no pre-copied certs).
+- **Packages & sources** — host your own packages, or subscribe to **external TUF delegations**.
+- **Online updates** — assign a package to a device; it pulls, installs, and reports back.
+- **Offline updates (Lockbox)** — build a signed bundle a device installs with no network — [docs/offline-updates.md](docs/offline-updates.md).
+- **Remote access** — a browser terminal / reverse-SSH into a device — [docs/remote-access-design.md](docs/remote-access-design.md).
+- **System page** — service status, resources, and live logs, in the console.
+- **Login** — none (trusted LAN), local user accounts, or GitHub — [docs/console-auth.md](docs/console-auth.md).
+- **Tooling** — a `credentials.zip` so `torizoncore-builder` works against your instance — [docs/tooling-credentials.md](docs/tooling-credentials.md).
+
 ## Quickstart
 
 **Requirements:** Docker with the `docker compose` plugin. On a fresh Debian/Ubuntu host:
@@ -116,8 +127,10 @@ The `*.ota.ce` hostnames are only needed for manual admin scripts (`get-credenti
 | [vps-deploy.md](docs/vps-deploy.md) | standing up a public instance (DNS, TLS, firewall) |
 | [console-auth.md](docs/console-auth.md) | per-user GitHub sign-in for the console |
 | [tooling-credentials.md](docs/tooling-credentials.md) | `credentials.zip` + using `torizoncore-builder` with your instance |
+| [offline-updates.md](docs/offline-updates.md) | building + installing a Lockbox (offline update) |
 | [remote-access-design.md](docs/remote-access-design.md) | reverse-SSH remote access and the browser terminal |
 | [torizon-api-compat.md](docs/torizon-api-compat.md) | how far the API matches Torizon Cloud's |
+| [upstream-divergence.md](docs/upstream-divergence.md) | how `repos/` tracks the uptane/* upstreams + the update log |
 | [status-report.md](docs/status-report.md) | historical record of the greenfield bring-up |
 
 `CLAUDE.md` at the repo root is a short orientation + hard-won-rules file for AI coding assistants;
