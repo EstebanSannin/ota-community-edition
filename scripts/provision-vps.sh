@@ -118,7 +118,7 @@ render_caddyfile() {
     # offline-update roles under /director (TCB derives that path from tufrepo.url). Both are
     # bearer-authenticated by the lockbox service, so they bypass the browser login. No `encode`:
     # TUF pins each file's length+hash, so a compressed response can never verify.
-    printf '\t@tooling path /tuf /tuf/* /director /director/*\n'
+    printf '\t@tooling path /tuf /tuf/* /director /director/* /treehub /treehub/*\n'
     printf '\thandle @tooling {\n\t\treverse_proxy lockbox:9920\n\t}\n'
     if [ -n "${MINIO_ROOT_PASSWORD:-}" ]; then
       # Pre-signed S3 URLs address the bucket by path, so they arrive here as

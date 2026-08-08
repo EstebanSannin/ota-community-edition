@@ -20,6 +20,7 @@ DIRECTOR = os.environ.get("DIRECTOR_URL", "http://ota-lith:7300/api/v1")
 REPOSERVER = os.environ.get("REPOSERVER_URL", "http://ota-lith:7100/api/v1")
 REPOSERVER_ROOT = os.environ.get("REPOSERVER_ROOT", "http://ota-lith:7100")
 DIRECTOR_ROOT = os.environ.get("DIRECTOR_ROOT", "http://ota-lith:7300")
+TREEHUB_ROOT = os.environ.get("TREEHUB_ROOT", "http://ota-lith:7400")
 KEYSERVER = os.environ.get("KEYSERVER_URL", "http://ota-lith:7200")
 NAMESPACE = os.environ.get("OTA_NAMESPACE", "default")
 PORT = int(os.environ.get("LOCKBOX_PORT", "9920"))
@@ -130,7 +131,7 @@ def credentials_zip(client_id, secret):
         # and grant_type=client_credentials (see OAuth2Client.scala).
         "oauth2": {"server": f"{base}/tuf/oauth2/token", "client_id": client_id,
                    "client_secret": secret, "scope": "tuf"},
-        "ostree": {"server": f"{base}/tuf/api/v3/"},
+        "ostree": {"server": f"{base}/treehub/api/v3/"},
     }
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -160,9 +161,11 @@ def repo_id_of():
 # Bearer-authenticated passthrough for tooling, keyed by URL prefix -> ota-lith backend:
 #   /tuf/...       -> reposerver  (garage-sign + torizoncore-builder push/lockbox: image repo)
 #   /director/...  -> director    (torizoncore-builder platform lockbox: offline-update roles)
-# TCB derives the director URL from tufrepo.url by swapping the path to /director, so we expose
-# both under the credentials.zip bearer and forward to the right internal service.
-PROXY_BACKENDS = {"/tuf": REPOSERVER_ROOT, "/director": DIRECTOR_ROOT}
+#   /treehub/...   -> treehub     (OSTree object store: `platform push` of an OS/ostree commit)
+# TCB derives the director URL from tufrepo.url by swapping the path to /director, and reads the
+# treehub URL from treehub.json's ostree.server; we expose all three under the credentials.zip
+# bearer and forward to the right internal service.
+PROXY_BACKENDS = {"/tuf": REPOSERVER_ROOT, "/director": DIRECTOR_ROOT, "/treehub": TREEHUB_ROOT}
 
 
 def proxy_prefix(path):
