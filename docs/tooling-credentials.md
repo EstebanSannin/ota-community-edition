@@ -112,6 +112,28 @@ docker run --rm -it -v /deploy -v "$PWD":/workdir -w /workdir \
 
 The package then shows up in the console's Packages list like any other, and can go into a Lockbox.
 
+## 4. Push a custom OS (OSTree) update
+
+You can also build and push a whole **OS image** — the same `credentials.zip` carries the OSTree
+server (`treehub`). On a build host with the base Tezi image for your board (see the download links
+in the memory / Toradex site):
+
+```bash
+TCB() { docker run --rm -v /deploy -v tcb-ostree:/storage -v "$PWD":/workdir -w /workdir torizon/torizoncore-builder:3 "$@"; }
+TCB images unpack torizon-docker-verdin-imx8mp-Tezi_7.7.0+build.40.tar
+mkdir -p changes/usr/etc && echo hello > changes/usr/etc/my-marker        # OSTree derives /etc from /usr/etc
+TCB union --changes-directory changes my-os
+TCB platform push my-os --credentials credentials.zip --hardwareid verdin-imx8mp
+```
+
+It uploads the OSTree commit to our treehub and signs the target — it then appears in **Packages**
+as an `OSTREE` package. Assign it to the device's **primary** ECU; the device pulls the commit from
+treehub **via the gateway** (not this tooling proxy), stages it, and applies it on the next **reboot**.
+
+> `-v /deploy` is required (TCB writes its tuf-repo there). The OSTree upload needs `HEAD` on
+> `/treehub/...` — the lockbox proxy handles it. `credentials.zip`'s `ostree.server` must point at
+> `<base>/treehub/api/v3/`.
+
 ## Troubleshooting
 
 | Symptom | Cause |
