@@ -87,6 +87,45 @@ re-running `scripts/provision-vps.sh` with `GITHUB_CLIENT_ID` set does this for 
 
 then `sudo docker restart ota-community-edition-caddy-1`.
 
+## Adding or removing people
+
+Access is an **allowlist of GitHub logins** in `OAUTH_ALLOWED_USERS` (`.env`), which the compose
+overlay passes to oauth2-proxy as `OAUTH2_PROXY_GITHUB_USERS`. Anyone not on the list can
+authenticate with GitHub but is then refused with a **403** — nothing else is needed on GitHub's
+side (the OAuth app is standard; any GitHub user can consent, the allowlist is the only gate).
+
+To add a colleague:
+
+```bash
+cd /opt/ota-community-edition
+# edit .env — append their GitHub LOGIN, comma-separated, no spaces:
+#   OAUTH_ALLOWED_USERS=EstebanSannin,theirlogin
+sudo docker compose -f compose.release.yaml -f compose.public.yaml -f compose.oauth2.yaml \
+  -f compose.observability.yaml -f compose.s3.yaml --env-file .env up -d oauth2-proxy
+```
+
+Removing someone is the same edit in reverse. Confirm what oauth2-proxy actually loaded:
+
+```bash
+docker inspect ota-community-edition-oauth2-proxy-1 \
+  --format '{{range .Config.Env}}{{println .}}{{end}}' | grep GITHUB_USERS
+```
+
+Three things that have each caused a wasted round:
+
+- **It's the GitHub login (username), not the email.** `EstebanSannin`, not `you@example.com`.
+  An email there authenticates and then 403s.
+- **`up -d` (recreate), not `docker restart`.** Env vars are fixed when the container is created,
+  so a plain restart keeps the *old* allowlist. Recreating with `--env-file` picks up the change.
+- **Never leave it empty** — an empty allowlist lets *any* GitHub account sign in.
+
+> **Adding someone grants full access.** GitHub mode has **no roles** — everyone allowed in is equal
+> and gets everything, including the **web terminal** (a root shell on your devices) and
+> **Settings → Tooling credentials** (the `credentials.zip` that signs packages your whole fleet
+> trusts). Only add people you'd trust with the fleet. If you need *limited* access (e.g. view-only),
+> that's the admin/non-admin split in **local user accounts** below — a different, mutually-exclusive
+> front, not GitHub.
+
 ## If you lock yourself out
 
 The raw console stays bound to localhost (`CONSOLE_BIND=127.0.0.1`), so you always have a way in
