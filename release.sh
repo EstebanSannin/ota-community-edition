@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build and push all five OTA CE images as multi-arch images:
-#   ota-lith, ota-ce-provisioner, ota-ce-lockbox, ota-ce-ops, ras
+# Build and push all six OTA CE images as multi-arch images:
+#   ota-lith, ota-ce-provisioner, ota-ce-lockbox, ota-ce-ops, ota-ce-auth, ras
 # Everything else in the stack is stock nginx/mariadb/caddy/minio plus mounted config.
 #
 # Prerequisites:
@@ -30,6 +30,7 @@ PROV="$NS/ota-ce-provisioner"
 RAS="$NS/ras"
 LOCKBOX="$NS/ota-ce-lockbox"
 OPS="$NS/ota-ce-ops"
+AUTH="$NS/ota-ce-auth"
 
 echo "== namespace: $NS   tag: $TAG   platforms: $PLATFORMS"
 
@@ -87,6 +88,11 @@ docker buildx build --platform "$PLATFORMS" \
   -t "$OPS:$TAG" -t "$OPS:latest" \
   --push ops
 
+echo "== building + pushing $AUTH ($TAG, latest)"
+docker buildx build --platform "$PLATFORMS" \
+  -t "$AUTH:$TAG" -t "$AUTH:latest" \
+  --push auth
+
 # The ras binary is compiled per-arch inside the Dockerfile, so the non-native arch builds
 # under QEMU emulation and can be slow. Set PLATFORMS=linux/amd64 (or your target only) to
 # speed it up, or RAS=skip to skip it.
@@ -101,6 +107,7 @@ cat <<EOF
 
   ✔ Pushed:
       $LITH:$TAG      (and :latest)
+      $AUTH:$TAG      (and :latest)
       $PROV:$TAG      (and :latest)
       $LOCKBOX:$TAG   (and :latest)
       $OPS:$TAG       (and :latest)
