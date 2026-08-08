@@ -36,7 +36,7 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none} :focu
 .nav a .badge{margin-left:auto;font-size:11px;background:var(--surface-3);color:var(--text-dim);border-radius:20px;padding:0 7px;font-weight:600}
 .nav a.active .badge{background:var(--accent);color:var(--accent-ink)}
 .rail .foot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:9px;color:var(--text-dim);font-size:12.5px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--idle)} .dot.up{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)} .dot.down{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
+.dot{width:8px;height:8px;flex:none;border-radius:50%;background:var(--idle)} .dot.up{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)} .dot.down{background:var(--bad);box-shadow:0 0 0 3px var(--bad-bg)}
 .main{min-width:0;display:flex;flex-direction:column}
 .topbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:15px 28px}
 .topbar h1{font-size:19px;font-weight:650;letter-spacing:-.02em;margin:0} .topbar .sub{color:var(--text-faint);font-size:12.5px;margin-top:1px} .spacer{flex:1}
