@@ -9,6 +9,20 @@ understand*. Live instance: `https://ota.samnium.tech` (Hetzner VPS, Debian 13).
 how the pieces fit and, more importantly, *why* they were chosen. Open work is in
 [docs/roadmap.md](docs/roadmap.md).
 
+## Docs
+
+- [architecture.md](docs/architecture.md) — how the pieces fit + *why* (read before structural changes)
+- [operations.md](docs/operations.md) — running it: the full service list, logs, resources, System page, S3
+- [vps-deploy.md](docs/vps-deploy.md) — standing up a public instance (DNS, TLS, firewall, overlays)
+- [console-auth.md](docs/console-auth.md) — login modes: none / local users / GitHub
+- [tooling-credentials.md](docs/tooling-credentials.md) — `credentials.zip` + `torizoncore-builder`
+- [offline-updates.md](docs/offline-updates.md) — building + installing a Lockbox
+- [remote-access-design.md](docs/remote-access-design.md) — reverse-SSH / web terminal (the `ras` service)
+- [upstream-divergence.md](docs/upstream-divergence.md) — how `repos/` tracks uptane/* + the update log
+- [torizon-api-compat.md](docs/torizon-api-compat.md) — API-compat evaluation
+- [roadmap.md](docs/roadmap.md) — what's not done yet
+- [status-report.md](docs/status-report.md) — historical greenfield bring-up record
+
 ## The shape of it
 
 `ota-lith` is **one JVM process** running four Uptane services, each on its own port. The

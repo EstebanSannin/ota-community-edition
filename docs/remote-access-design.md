@@ -1,6 +1,7 @@
 # Remote Access (RAC-compatible) — Design
 
-Status: **design / proposal** (feasibility proven by two spikes — see end). No product code yet.
+Status: **implemented** — this design shipped as the `ras` service (`remote-access/ras`, reached via
+the console's Remote Access page and the gateway `/ras/` route). Kept as the design record + rationale.
 
 ## 1. Goal & principles
 Give this open OTA instance the same "remote access" superpower Torizon Cloud has: a secure, on-demand **reverse-SSH tunnel** to a device behind NAT, driven by the **unmodified** Torizon Remote Access Client (`rac`) that already ships in Torizon OS.
