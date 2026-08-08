@@ -20,6 +20,7 @@ import urllib.error, urllib.parse, urllib.request, zipfile
 DIRECTOR = os.environ.get("DIRECTOR_URL", "http://ota-lith:7300/api/v1")
 REPOSERVER = os.environ.get("REPOSERVER_URL", "http://ota-lith:7100/api/v1")
 REPOSERVER_ROOT = os.environ.get("REPOSERVER_ROOT", "http://ota-lith:7100")
+DIRECTOR_ROOT = os.environ.get("DIRECTOR_ROOT", "http://ota-lith:7300")
 KEYSERVER = os.environ.get("KEYSERVER_URL", "http://ota-lith:7200")
 NAMESPACE = os.environ.get("OTA_NAMESPACE", "default")
 PORT = int(os.environ.get("LOCKBOX_PORT", "9920"))
@@ -225,12 +226,22 @@ def repo_id_of():
         return r.headers["x-ats-tuf-repo-id"]
 
 
-def proxy_to_reposerver(handler, path, method):
-    """Bearer-authenticated passthrough for tooling.
+# Bearer-authenticated passthrough for tooling, keyed by URL prefix -> ota-lith backend:
+#   /tuf/...       -> reposerver  (garage-sign + torizoncore-builder push/lockbox: image repo)
+#   /director/...  -> director    (torizoncore-builder platform lockbox: offline-update roles)
+# TCB derives the director URL from tufrepo.url by swapping the path to /director, so we expose
+# both under the credentials.zip bearer and forward to the right internal service.
+PROXY_BACKENDS = {"/tuf": REPOSERVER_ROOT, "/director": DIRECTOR_ROOT}
 
-    tufrepo.url is <public>/tuf, and garage-sign appends /api/v1/user_repo/... to it, so strip
-    the /tuf prefix and hand the rest to ota-lith with the namespace header it requires.
-    """
+
+def proxy_prefix(path):
+    for p in PROXY_BACKENDS:
+        if path.startswith(p + "/"):
+            return p
+    return None
+
+
+def proxy_to_ota(handler, path, method, prefix):
     token = ""
     auth = handler.headers.get("Authorization", "")
     if auth[:7].lower() == "bearer ":
@@ -241,7 +252,7 @@ def proxy_to_reposerver(handler, path, method):
     n = int(handler.headers.get("Content-Length", "0") or 0)
     if n:
         body = handler.rfile.read(n)
-    url = REPOSERVER_ROOT + path[len("/tuf"):]
+    url = PROXY_BACKENDS[prefix] + path[len(prefix):]
     fwd = {"x-ats-namespace": NAMESPACE}
     for h in ("Content-Type", "x-ats-role-checksum"):
         if handler.headers.get(h):
@@ -290,8 +301,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             c = current_client()
             return self._send(200, json.dumps({"issued": c}))
 
-        if path.startswith("/tuf/"):
-            return proxy_to_reposerver(self, self.path, "GET")     # keep the query string
+        pfx = proxy_prefix(path)
+        if pfx:
+            return proxy_to_ota(self, self.path, "GET", pfx)       # keep the query string
 
         m = re.match(r"^/api/lockbox/(.+)\.zip$", path)
         if m:
@@ -324,7 +336,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, data, "application/zip",
                               [("Content-Disposition", 'attachment; filename="credentials.zip"')])
 
-        if path == "/tuf/oauth2/token":
+        # garage-sign posts to the server value as-is (/tuf/oauth2/token); torizoncore-builder
+        # appends "/token" to it, so accept the doubled path too. Same handler either way.
+        if path in ("/tuf/oauth2/token", "/tuf/oauth2/token/token"):
             auth = self.headers.get("Authorization", "")
             if auth[:6].lower() != "basic ":
                 return self._send(401, json.dumps({"error": "basic auth required"}))
@@ -341,14 +355,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(200, json.dumps({"access_token": issue_token(),
                                                "token_type": "Bearer", "expires_in": TOKEN_TTL}))
 
-        if path.startswith("/tuf/"):
-            return proxy_to_reposerver(self, self.path, "POST")   # keep the query string
+        pfx = proxy_prefix(path)
+        if pfx:
+            return proxy_to_ota(self, self.path, "POST", pfx)     # keep the query string
         self._send(404, json.dumps({"error": "not found"}))
 
     def do_PUT(self):
         path = self.path.split("?")[0]
-        if path.startswith("/tuf/"):
-            return proxy_to_reposerver(self, self.path, "PUT")   # keep the query string
+        pfx = proxy_prefix(path)
+        if pfx:
+            return proxy_to_ota(self, self.path, "PUT", pfx)      # keep the query string
         self._send(404, json.dumps({"error": "not found"}))
 
     def do_DELETE(self):
@@ -359,8 +375,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 _tokens.clear()
             print("lockbox: tooling credential revoked", flush=True)
             return self._send(204, b"")
-        if path.startswith("/tuf/"):
-            return proxy_to_reposerver(self, self.path, "DELETE")  # keep the query string
+        pfx = proxy_prefix(path)
+        if pfx:
+            return proxy_to_ota(self, self.path, "DELETE", pfx)   # keep the query string
         self._send(404, json.dumps({"error": "not found"}))
 
 

@@ -114,8 +114,12 @@ render_caddyfile() {
     # NOTE: deliberately NO `encode` here. TUF pins the sha256 AND length of each metadata file,
     # so a compressed response can never verify — the same trap that broke every device update
     # until the gateway stopped gzipping (see ota-ce/gateway.conf).
-    printf '\t@tuf path /tuf /tuf/*\n'
-    printf '\thandle @tuf {\n\t\treverse_proxy lockbox:9920\n\t}\n'
+    # Tooling (torizoncore-builder / garage-sign): the image repo lives under /tuf and the director
+    # offline-update roles under /director (TCB derives that path from tufrepo.url). Both are
+    # bearer-authenticated by the lockbox service, so they bypass the browser login. No `encode`:
+    # TUF pins each file's length+hash, so a compressed response can never verify.
+    printf '\t@tooling path /tuf /tuf/* /director /director/*\n'
+    printf '\thandle @tooling {\n\t\treverse_proxy lockbox:9920\n\t}\n'
     if [ -n "${MINIO_ROOT_PASSWORD:-}" ]; then
       # Pre-signed S3 URLs address the bucket by path, so they arrive here as
       # /<bucket>/<key>?X-Amz-... Pass them to MinIO byte-for-byte: the path is part of what the
