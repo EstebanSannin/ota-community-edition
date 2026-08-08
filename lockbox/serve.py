@@ -216,6 +216,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def do_HEAD(self):
+        # garage-push (OSTree upload) HEADs /treehub/api/v3/objects/... to skip objects that already
+        # exist. Only the bearer proxy needs HEAD; anything else gets a bodyless 404.
+        pfx = proxy_prefix(self.path.split("?")[0])
+        if pfx:
+            return proxy_to_ota(self, self.path, "HEAD", pfx)
+        self.send_response(404); self.end_headers()
+
     def do_GET(self):
         path = self.path.split("?")[0]
         if path in ("/api/health", "/health"):
