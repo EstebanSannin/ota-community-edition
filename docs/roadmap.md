@@ -47,6 +47,18 @@ root-ish shell on a device, so this matters as soon as more than one person has 
 **Fleet health view.** Last check-in per device, surfacing the ones that have gone quiet — a device
 that stopped reporting is invisible in the current UI.
 
+**Push device state to the console instead of polling (SSE).** Today the console re-fetches the
+device list *and* one ECU call per device (`loadDevices()` in `console/js/views/devices.js`) on an
+~8s timer, and — worse — it keeps polling on views that don't show devices and on a hidden/background
+tab. That's an N+1 fetch on a fixed timer: fine for a handful of devices on one machine, but it does
+not scale (100 devices ≈ 101 requests every 8s, forever). The proper fix is to **push**: ota-lith
+already has a message bus that emits on device check-in / install-complete, and we already run SSE
+plumbing (the `ops` log stream). A small sidecar subscribes to those events and streams device-state
+changes to the console over SSE (`EventSource`), which updates reactively — no timer, no N+1.
+Decided (2026-08-08) to go straight to this push model rather than the cheaper stops-gaps (poll only
+when visible / pause on hidden tab / server-side aggregation endpoint), which stay as fallbacks if
+SSE proves heavier than expected. Reuse the `ops` SSE + docker-socket-proxy pattern for shape.
+
 ## Operational debt
 
 **~~Push the images to a registry.~~ Done — 0.3.0, 2026-08-08.** All **six** images
