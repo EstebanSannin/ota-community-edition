@@ -81,3 +81,16 @@ assumption in `garage-sign` (`AuthenticatedHttpBackend.scala`, which only skips 
 
 **Repo hygiene.** The work lives on `greenfield-boot-fixes`, well ahead of `v2`/`v3`. At some point:
 decide the branch story, and whether the repo stays public.
+
+**Set up guardrails for agentic development** (not project code — how the project is *worked on*).
+Most of this project was built with an AI coding agent acting with the operator's own access (local
+shell + the SSH keys/logins already on the dev machine — that is how it reached the VPS, the arm64
+VM, and the m920x build host). To keep that safe and repeatable:
+- **Least-privilege remote access** — a scoped deploy user + per-purpose SSH keys instead of `root@VPS`,
+  so an agent mistake has a small blast radius.
+- **A command allowlist** (`.claude/settings.json`) — auto-allow safe read-only commands (`git status`,
+  `docker ps`, …) while keeping destructive/production actions behind a prompt.
+- **A short "deploy & access model" note** (which hosts, which creds, what needs a human, staging
+  before production) — in CLAUDE.md or docs, so a fresh session doesn't rediscover it.
+- Keep the existing good habits explicit: branch + small commits (the undo button), verify against the
+  live instance/device, and keep production changes human-approved.
