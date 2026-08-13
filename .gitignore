@@ -10,3 +10,6 @@ project/project
 
 # Rendered at deploy by scripts/provision-vps.sh (contains the bcrypt hash). Template: caddy/Caddyfile.example
 caddy/Caddyfile
+
+# Local Claude Code session config (personal permissions, launch previews) -- not shared
+.claude/
