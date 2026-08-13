@@ -265,7 +265,9 @@ poweroff_vms(){
 }
 
 # Recorded cloud UUIDs of provisioned VMs (one per line).
-fleet_uuids(){ cat "$VMS_DIR"/*.provisioned 2>/dev/null | grep -E '^[0-9a-f-]{36}$' | sort -u; }
+# NB: the trailing `|| true` matters -- grep exits 1 when there are no markers, and under
+# `set -e` that non-zero would otherwise abort down/purge before they do anything.
+fleet_uuids(){ cat "$VMS_DIR"/*.provisioned 2>/dev/null | grep -E '^[0-9a-f-]{36}$' | sort -u || true; }
 
 delete_overlays(){
   local i
